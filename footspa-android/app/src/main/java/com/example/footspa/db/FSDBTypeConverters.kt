@@ -1,0 +1,33 @@
+package com.example.footspa.db
+
+import androidx.room.TypeConverter
+import com.example.footspa.common.json
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonUnquotedLiteral
+import java.math.BigDecimal
+
+class FSDBTypeConverters {
+
+    @TypeConverter
+    fun stringToBigDecimal(value: String): BigDecimal {
+        return json.decodeFromString<JsonPrimitive>(value).content.toBigDecimal()
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @TypeConverter
+    fun bigDecimalToString(value: BigDecimal): String {
+        return json.encodeToString(JsonUnquotedLiteral(value.toPlainString()))
+    }
+
+    @TypeConverter
+    fun stringToList(value: String): List<String> {
+        return json.decodeFromString(value)
+    }
+
+    @TypeConverter
+    fun listToString(value: List<String>): String {
+        return json.encodeToString(value)
+    }
+
+}

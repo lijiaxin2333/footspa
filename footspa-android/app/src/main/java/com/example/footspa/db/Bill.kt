@@ -3,16 +3,15 @@ package com.example.footspa.db
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 
 @Entity(tableName = "bills_all")
-data class Bills(
+data class Bill(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     @ColumnInfo(name = "date") val date: Long,
     @ColumnInfo("money_from") val fromId: Long,
     @ColumnInfo("money_to") val toId: Long,
-    @ColumnInfo("money") val money: @Serializable(with = BigDecimalSerializer::class) BigDecimal,
+    @ColumnInfo("money") val money: BigDecimal,
     @ColumnInfo("valid") val valid: Boolean = true,
     @ColumnInfo("tags") val tags: List<String>,
     @ColumnInfo("remark") val remark: String,
