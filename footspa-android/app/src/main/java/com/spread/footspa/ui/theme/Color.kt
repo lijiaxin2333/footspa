@@ -1,4 +1,4 @@
-package com.example.footspa.ui.theme
+package com.spread.footspa.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

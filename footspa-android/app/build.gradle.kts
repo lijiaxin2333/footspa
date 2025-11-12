@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.footspa"
+    namespace = "com.spread.footspa"
     compileSdk =
         libs.versions.compileSdk
             .get()

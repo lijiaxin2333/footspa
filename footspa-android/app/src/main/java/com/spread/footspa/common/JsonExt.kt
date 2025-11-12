@@ -1,4 +1,4 @@
-package com.example.footspa.common
+package com.spread.footspa.common
 
 import kotlinx.serialization.json.Json
 

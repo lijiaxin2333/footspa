@@ -1,11 +1,11 @@
-package com.example.footspa.db
+package com.spread.footspa.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.math.BigDecimal
 
-@Entity(tableName = "bills_all")
+@Entity(tableName = SQLConst.TABLE_NAME_BILL)
 data class Bill(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     @ColumnInfo(name = "date") val date: Long,

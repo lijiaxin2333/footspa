@@ -1,4 +1,4 @@
-package com.example.footspa.db
+package com.spread.footspa.db
 
 enum class MoneyNodeType(val str: String) {
     None(""),

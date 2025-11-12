@@ -1,4 +1,4 @@
-package com.example.footspa.ui
+package com.spread.footspa.ui.card
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -7,5 +7,4 @@ import androidx.compose.ui.Modifier
 fun LegacyCardScreen(
     modifier: Modifier = Modifier
 ) {
-
 }

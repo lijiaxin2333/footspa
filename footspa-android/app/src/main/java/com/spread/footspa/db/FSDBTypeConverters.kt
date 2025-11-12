@@ -1,7 +1,7 @@
-package com.example.footspa.db
+package com.spread.footspa.db
 
 import androidx.room.TypeConverter
-import com.example.footspa.common.json
+import com.spread.footspa.common.json
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonUnquotedLiteral
