@@ -13,10 +13,11 @@ final class FootspaDatabase: ObservableObject {
     @Published private(set) var cardInfos: [CardInfo] = []
 
     private init() {
-        let databaseURL = try! FileManager.default
-                    .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-                    .appendingPathComponent("footspa_db.sqlite")
-        
+//        let databaseURL = try! FileManager.default
+//                    .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+//                    .appendingPathComponent("footspa_db.sqlite")
+        // 临时切换方便调试
+        let databaseURL = URL(fileURLWithPath: "/Users/ljx/Desktop/footspa_db.sqlite")
         dbQueue = try! DatabaseQueue(path: databaseURL.path)
         
         try? migrator.migrate(dbQueue)
