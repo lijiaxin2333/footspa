@@ -6,8 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7F64EB3590264ECC19F17484 /* Pods_footspa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 077A426875110E0396157F90 /* Pods_footspa.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		077A426875110E0396157F90 /* Pods_footspa.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_footspa.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		76D5C8182EC585BD00971147 /* footspa.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = footspa.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9867A64CBFE848F9C06C2D16 /* Pods-footspa.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-footspa.debug.xcconfig"; path = "Target Support Files/Pods-footspa/Pods-footspa.debug.xcconfig"; sourceTree = "<group>"; };
+		F3C3EC6D49486163E6AE3337 /* Pods-footspa.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-footspa.release.xcconfig"; path = "Target Support Files/Pods-footspa/Pods-footspa.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,17 +43,37 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7F64EB3590264ECC19F17484 /* Pods_footspa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		03E8482F08F666BB438791E5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				077A426875110E0396157F90 /* Pods_footspa.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		6B74F53246D183039C0C9399 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				9867A64CBFE848F9C06C2D16 /* Pods-footspa.debug.xcconfig */,
+				F3C3EC6D49486163E6AE3337 /* Pods-footspa.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		76D5C80F2EC585BD00971147 = {
 			isa = PBXGroup;
 			children = (
 				76D5C81A2EC585BD00971147 /* footspa */,
 				76D5C8192EC585BD00971147 /* Products */,
+				6B74F53246D183039C0C9399 /* Pods */,
+				03E8482F08F666BB438791E5 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -65,9 +92,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 76D5C82B2EC585BE00971147 /* Build configuration list for PBXNativeTarget "footspa" */;
 			buildPhases = (
+				0BADE5AA320B49D4605260D0 /* [CP] Check Pods Manifest.lock */,
 				76D5C8142EC585BD00971147 /* Sources */,
 				76D5C8152EC585BD00971147 /* Frameworks */,
 				76D5C8162EC585BD00971147 /* Resources */,
+				C6BD12290725A333A108CA9C /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -77,8 +106,6 @@
 				76D5C81A2EC585BD00971147 /* footspa */,
 			);
 			name = footspa;
-			packageProductDependencies = (
-			);
 			productName = footspa;
 			productReference = 76D5C8182EC585BD00971147 /* footspa.app */;
 			productType = "com.apple.product-type.application";
@@ -127,6 +154,52 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		0BADE5AA320B49D4605260D0 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-footspa-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		C6BD12290725A333A108CA9C /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-footspa/Pods-footspa-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-footspa/Pods-footspa-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-footspa/Pods-footspa-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		76D5C8142EC585BD00971147 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -140,6 +213,7 @@
 /* Begin XCBuildConfiguration section */
 		76D5C82C2EC585BE00971147 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9867A64CBFE848F9C06C2D16 /* Pods-footspa.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -150,7 +224,6 @@
 				INFOPLIST_FILE = footspa/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -172,6 +245,7 @@
 		};
 		76D5C82D2EC585BE00971147 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F3C3EC6D49486163E6AE3337 /* Pods-footspa.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -182,7 +256,6 @@
 				INFOPLIST_FILE = footspa/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -240,7 +313,7 @@
 				DEVELOPMENT_TEAM = YJAZ87NRYQ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -304,7 +377,7 @@
 				DEVELOPMENT_TEAM = YJAZ87NRYQ;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
