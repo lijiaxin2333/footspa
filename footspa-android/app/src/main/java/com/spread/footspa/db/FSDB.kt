@@ -45,7 +45,7 @@ abstract class FSDB : RoomDatabase() {
                 context = MainApplication.instance,
                 klass = FSDB::class.java,
                 name = "fengshedb"
-            ).addCallback(cb).build()
+            ).addCallback(cb).setJournalMode(JournalMode.TRUNCATE).build()
         }
 
         val dao: FSDao get() = db.dao()

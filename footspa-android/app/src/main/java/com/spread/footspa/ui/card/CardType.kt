@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -72,17 +73,7 @@ fun CardTypeManagementScreen(
             Text(text = "新增会员卡类型")
         }
 
-        LazyColumn {
-            items(cardInfoList.size) { index ->
-                val info = cardInfoList[index]
-                CardInfoItem(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(75.dp),
-                    cardInfo = info
-                )
-            }
-        }
+        CardTypeList(modifier = Modifier, cardInfoList = cardInfoList)
     }
 
     if (showAddCardTypeDialog) {
@@ -101,19 +92,45 @@ fun CardTypeManagementScreen(
     }
 }
 
+
+@Composable
+fun CardTypeList(
+    modifier: Modifier,
+    cardInfoList: List<CardInfo>,
+    onCardInfoClick: ((CardInfo) -> Unit)? = null
+) {
+    LazyColumn(modifier = modifier) {
+        items(cardInfoList.size) { index ->
+            val info = cardInfoList[index]
+            CardInfoItem(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(75.dp),
+                cardInfo = info
+            )
+        }
+    }
+}
+
 @Composable
 fun CardInfoItem(
     modifier: Modifier,
-    cardInfo: CardInfo
+    cardInfo: CardInfo,
+    onCardInfoClick: ((CardInfo) -> Unit)? = null
 ) {
     Box(modifier = modifier) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            Text(text = cardInfo.name)
-            Text(text = cardInfo.price.toPlainString())
-            Text(text = cardInfo.discount)
+        Card(modifier = Modifier.fillMaxSize(), onClick = {
+            onCardInfoClick?.invoke(cardInfo)
+        }) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "卡类: ${cardInfo.name}")
+                Text(text = "${cardInfo.price.toPlainString()}起充")
+                Text(text = "${cardInfo.discount}折")
+            }
         }
         if (cardInfo.legacy) {
             Icon(
@@ -206,7 +223,8 @@ fun AddCardTypeDialog(
                         name = cardNameInputText,
                         price = it,
                         discount = cardDiscountInputText,
-                        legacy = cardLegacy
+                        legacy = cardLegacy,
+                        valid = true
                     )
                     onConfirm(info)
                 }

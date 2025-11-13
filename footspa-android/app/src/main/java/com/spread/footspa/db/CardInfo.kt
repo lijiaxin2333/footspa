@@ -11,5 +11,6 @@ data class CardInfo(
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "price") val price: BigDecimal,
     @ColumnInfo(name = "discount") val discount: String,
-    @ColumnInfo(name = "legacy") val legacy: Boolean
+    @ColumnInfo(name = "legacy") val legacy: Boolean,
+    @ColumnInfo(name = "valid") val valid: Boolean
 )
