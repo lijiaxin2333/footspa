@@ -13,10 +13,6 @@ final class FootspaDatabase: ObservableObject {
     @Published private(set) var cardInfos: [CardInfo] = []
 
     private init() {
-//        let databaseURL = try! FileManager.default
-//                    .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-//                    .appendingPathComponent("footspa_db.sqlite")
-        // 临时切换方便调试
         let databaseURL = URL(fileURLWithPath: "/Users/ljx/Desktop/footspa_db.sqlite")
         dbQueue = try! DatabaseQueue(path: databaseURL.path)
         
@@ -57,123 +53,111 @@ final class FootspaDatabase: ObservableObject {
     
     // MARK: - 异步刷新数据
     func refreshMoneyNodes() {
-        Future<[MoneyNode], Error> { promise in
-            do {
-                let nodes = try self.dbQueue.read { db in
-                    try MoneyNode.fetchAll(db)
-                }
-                promise(.success(nodes))
-            } catch {
-                promise(.failure(error))
+        Just(())
+            .subscribe(on: DispatchQueue.global(qos: .background))
+            .tryMap { [weak self] _ -> [MoneyNode] in
+                guard let self = self else { return [] }
+                return try self.dbQueue.read { try MoneyNode.fetchAll($0) }
             }
-        }
-        .receive(on: DispatchQueue.main)
-        .sink { _ in } receiveValue: { [weak self] nodes in
-            self?.moneyNodes = nodes
-        }
-        .store(in: &cancellables)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case let .failure(error) = completion {
+                    print("Refresh MoneyNodes failed:", error)
+                }
+            } receiveValue: { [weak self] nodes in
+                self?.moneyNodes = nodes
+            }
+            .store(in: &cancellables)
     }
     
     func refreshBills() {
-        Future<[Bill], Error> { promise in
-            do {
-                let allBills = try self.dbQueue.read { db in
-                    try Bill.fetchAll(db)
-                }
-                promise(.success(allBills))
-            } catch {
-                promise(.failure(error))
+        Just(())
+            .subscribe(on: DispatchQueue.global(qos: .background))
+            .tryMap { [weak self] _ -> [Bill] in
+                guard let self = self else { return [] }
+                return try self.dbQueue.read { try Bill.fetchAll($0) }
             }
-        }
-        .receive(on: DispatchQueue.main)
-        .sink { _ in } receiveValue: { [weak self] bills in
-            self?.bills = bills
-        }
-        .store(in: &cancellables)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case let .failure(error) = completion {
+                    print("Refresh Bills failed:", error)
+                }
+            } receiveValue: { [weak self] bills in
+                self?.bills = bills
+            }
+            .store(in: &cancellables)
     }
     
     func refreshCardInfos() {
-        Future<[CardInfo], Error> { promise in
-            do {
-                let infos = try self.dbQueue.read { db in
-                    try CardInfo.fetchAll(db)
-                }
-                promise(.success(infos))
-            } catch {
-                promise(.failure(error))
+        Just(())
+            .subscribe(on: DispatchQueue.global(qos: .background))
+            .tryMap { [weak self] _ -> [CardInfo] in
+                guard let self = self else { return [] }
+                return try self.dbQueue.read { try CardInfo.fetchAll($0) }
             }
-        }
-        .receive(on: DispatchQueue.main)
-        .sink { _ in } receiveValue: { [weak self] infos in
-            self?.cardInfos = infos
-        }
-        .store(in: &cancellables)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case let .failure(error) = completion {
+                    print("Refresh CardInfos failed:", error)
+                }
+            } receiveValue: { [weak self] infos in
+                self?.cardInfos = infos
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - 异步写入
     func insertMoneyNode(_ node: MoneyNode) {
-        Future<Void, Error> { promise in
-            do {
-                try self.dbQueue.write { db in
-                    try node.insert(db)
+        Just(node)
+            .subscribe(on: DispatchQueue.global(qos: .background))
+            .tryMap { [weak self] node -> Void in
+                guard let self = self else { return }
+                try self.dbQueue.write { try node.insert($0) }
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case let .failure(error) = completion {
+                    print("Insert MoneyNode failed:", error)
                 }
-                promise(.success(()))
-            } catch {
-                promise(.failure(error))
+            } receiveValue: { [weak self] _ in
+                self?.refreshMoneyNodes()
             }
-        }
-        .receive(on: DispatchQueue.main)
-        .sink { completion in
-            if case let .failure(error) = completion {
-                print("Insert MoneyNode failed:", error)
-            }
-        } receiveValue: { [weak self] _ in
-            self?.refreshMoneyNodes()
-        }
-        .store(in: &cancellables)
+            .store(in: &cancellables)
     }
     
     func insertBill(_ bill: Bill) {
-        Future<Void, Error> { promise in
-            do {
-                try self.dbQueue.write { db in
-                    try bill.insert(db)
+        Just(bill)
+            .subscribe(on: DispatchQueue.global(qos: .background))
+            .tryMap { [weak self] bill -> Void in
+                guard let self = self else { return }
+                try self.dbQueue.write { try bill.insert($0) }
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case let .failure(error) = completion {
+                    print("Insert Bill failed:", error)
                 }
-                promise(.success(()))
-            } catch {
-                promise(.failure(error))
+            } receiveValue: { [weak self] _ in
+                self?.refreshBills()
             }
-        }
-        .receive(on: DispatchQueue.main)
-        .sink { completion in
-            if case let .failure(error) = completion {
-                print("Insert Bill failed:", error)
-            }
-        } receiveValue: { [weak self] _ in
-            self?.refreshBills()
-        }
-        .store(in: &cancellables)
+            .store(in: &cancellables)
     }
     
     func insertCardInfo(_ cardInfo: CardInfo) {
-        Future<Void, Error> { promise in
-            do {
-                try self.dbQueue.write { db in
-                    try cardInfo.insert(db)
+        Just(cardInfo)
+            .subscribe(on: DispatchQueue.global(qos: .background))
+            .tryMap { [weak self] cardInfo -> Void in
+                guard let self = self else { return }
+                try self.dbQueue.write { try cardInfo.insert($0) }
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case let .failure(error) = completion {
+                    print("Insert CardInfo failed:", error)
                 }
-                promise(.success(()))
-            } catch {
-                promise(.failure(error))
+            } receiveValue: { [weak self] _ in
+                self?.refreshCardInfos()
             }
-        }
-        .receive(on: DispatchQueue.main)
-        .sink { completion in
-            if case let .failure(error) = completion {
-                print("Insert CardInfo failed:", error)
-            }
-        } receiveValue: { [weak self] _ in
-            self?.refreshCardInfos()
-        }
-        .store(in: &cancellables)
+            .store(in: &cancellables)
     }
 }
