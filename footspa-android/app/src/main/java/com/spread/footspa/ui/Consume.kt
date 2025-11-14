@@ -241,8 +241,11 @@ private fun OneConsumption(
                 consumption.markNeedAdd(MoneyNodeType.Customer.str, false)
             }) { Text(text = "确定添加") }
         } else {
+            val newCustomer = FSDB.moneyNodeFlow.value.find {
+                consumption.customer == it
+            } == null
             consumption.customer?.let {
-                Text("姓名: ${it.name}")
+                Text("姓名: ${it.name}" + if (newCustomer) "(新)" else "")
                 Text("电话: ${it.keys?.joinToString()}")
             }
         }
