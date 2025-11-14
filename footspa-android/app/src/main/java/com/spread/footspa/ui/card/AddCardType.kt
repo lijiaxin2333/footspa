@@ -1,6 +1,7 @@
 package com.spread.footspa.ui.card
 
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,8 +33,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.spread.footspa.db.CardInfo
+import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.ui.common.IconConstants
 import com.spread.footspa.ui.common.MoneyExpr
@@ -52,7 +55,7 @@ fun CardTypeManagementScreen(
 
     val scope = rememberCoroutineScope()
 
-    val cardInfoList = remember { mutableStateListOf<CardInfo>() }
+    val cardInfoList = remember { mutableStateListOf<CardType>() }
 
     LaunchedEffect(Unit) {
         scope.launch(Dispatchers.IO) {
@@ -83,7 +86,7 @@ fun CardTypeManagementScreen(
             },
             onConfirm = {
                 scope.launch(Dispatchers.IO) {
-                    val ids = FSDB.dao.insertCardInfo(it)
+                    val ids = FSDB.insertCardInfo(it)
                     Log.d("Spread", "card ids: $ids")
                 }
                 showAddCardTypeDialog = false
@@ -96,9 +99,10 @@ fun CardTypeManagementScreen(
 @Composable
 fun CardTypeList(
     modifier: Modifier,
-    cardInfoList: List<CardInfo>,
-    onCardInfoClick: ((CardInfo) -> Unit)? = null
+    cardInfoList: List<CardType>,
+    onCardInfoClick: ((CardType) -> Unit)? = null
 ) {
+    var selectedCardInfo by remember { mutableStateOf<CardType?>(null) }
     LazyColumn(modifier = modifier) {
         items(cardInfoList.size) { index ->
             val info = cardInfoList[index]
@@ -106,7 +110,12 @@ fun CardTypeList(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(75.dp),
-                cardInfo = info
+                cardInfo = info,
+                isSelected = selectedCardInfo == info,
+                onCardInfoClick = {
+                    selectedCardInfo = info
+                    onCardInfoClick?.invoke(info)
+                }
             )
         }
     }
@@ -115,15 +124,25 @@ fun CardTypeList(
 @Composable
 fun CardInfoItem(
     modifier: Modifier,
-    cardInfo: CardInfo,
-    onCardInfoClick: ((CardInfo) -> Unit)? = null
+    cardInfo: CardType,
+    isSelected: Boolean,
+    onCardInfoClick: ((CardType) -> Unit)? = null
 ) {
     Box(modifier = modifier) {
-        Card(modifier = Modifier.fillMaxSize(), onClick = {
-            onCardInfoClick?.invoke(cardInfo)
-        }) {
+        Card(
+            modifier = Modifier
+                .fillMaxSize(),
+            onClick = {
+                onCardInfoClick?.invoke(cardInfo)
+            }) {
             Row(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color =
+                            if (isSelected) Color.Red
+                            else MaterialTheme.colorScheme.background
+                    ),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -147,7 +166,7 @@ fun CardInfoItem(
 @Composable
 fun AddCardTypeDialog(
     onDismiss: () -> Unit,
-    onConfirm: (CardInfo) -> Unit
+    onConfirm: (CardType) -> Unit
 ) {
     var cardNameInputText by remember { mutableStateOf("") }
     var cardDiscountInputText by remember { mutableStateOf("") }
@@ -219,7 +238,7 @@ fun AddCardTypeDialog(
         confirmButton = {
             TextButton(onClick = {
                 value?.let {
-                    val info = CardInfo(
+                    val info = CardType(
                         name = cardNameInputText,
                         price = it,
                         discount = cardDiscountInputText,

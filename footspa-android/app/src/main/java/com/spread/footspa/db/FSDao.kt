@@ -21,7 +21,7 @@ abstract class FSDao {
     abstract suspend fun insertMassageService(vararg service: MassageService): List<Long>
 
     @Insert
-    abstract suspend fun insertCardInfo(vararg cardInfo: CardInfo): List<Long>
+    abstract suspend fun insertCardInfo(vararg cardInfo: CardType): List<Long>
 
     @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE}")
     abstract fun listenToAllMoneyNodes(): Flow<List<MoneyNode>>
@@ -32,8 +32,8 @@ abstract class FSDao {
     @Query("SELECT * FROM ${SQLConst.TABLE_NAME_BILL}")
     abstract fun listenToAllBills(): Flow<List<Bill>>
 
-    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_CARD_INFO}")
-    abstract fun listenToAllCardInfo(): Flow<List<CardInfo>>
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_CARD_TYPE}")
+    abstract fun listenToAllCardInfo(): Flow<List<CardType>>
 
 
     fun checkDBHealthy(): Boolean {

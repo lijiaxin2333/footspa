@@ -15,7 +15,7 @@ import com.spread.footspa.runOnApplicationScope
         MoneyNode::class,
         Bill::class,
         MassageService::class,
-        CardInfo::class
+        CardType::class
     ],
     version = 1
 )
@@ -112,19 +112,22 @@ abstract class FSDB : RoomDatabase() {
         suspend fun insertCard(
             name: String,
             phoneNumbers: List<String>,
-            cardId: Long
-        ) {
+            typeId: Long
+        ): List<Long> {
             val moneyNode = buildMoneyNode {
                 this.name = name
                 type = MoneyNodeType.Card
                 keys = phoneNumbers
-                this.cardId = cardId
+                cardTypeId = typeId
                 cardValid = true
             }
-            dao.insertMoneyNode(moneyNode)
+            return dao.insertMoneyNode(moneyNode)
         }
 
-        suspend fun insertCardInfo(vararg cardInfo: CardInfo) = dao.insertCardInfo(*cardInfo)
+        suspend fun insertCardInfo(vararg cardInfo: CardType) = dao.insertCardInfo(*cardInfo)
+
+        suspend fun insertMassageService(vararg services: MassageService) =
+            dao.insertMassageService(*services)
 
         fun getCardByPhoneNumber(phoneNumber: String): List<MoneyNode> {
             return moneyNodeFlow.value.filter {

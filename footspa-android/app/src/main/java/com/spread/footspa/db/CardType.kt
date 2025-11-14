@@ -5,8 +5,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.math.BigDecimal
 
-@Entity(tableName = SQLConst.TABLE_NAME_CARD_INFO)
-data class CardInfo(
+@Entity(tableName = SQLConst.TABLE_NAME_CARD_TYPE)
+data class CardType(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "price") val price: BigDecimal,

@@ -10,7 +10,7 @@ data class MoneyNode(
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "type") val type: MoneyNodeType,
     @ColumnInfo(name = "keys") val keys: List<String>?,
-    @ColumnInfo(name = "card_id") val cardId: Long?,
+    @ColumnInfo(name = "card_type_id") val cardTypeId: Long?,
     @ColumnInfo(name = "card_valid") val cardValid: Boolean?,
 ) {
     fun containsKey(key: String): Boolean = keys?.contains(key) ?: false
@@ -20,7 +20,7 @@ class MoneyNodeBuilder {
     var name = "null"
     var type = MoneyNodeType.None
     var keys: List<String>? = null
-    var cardId: Long? = null
+    var cardTypeId: Long? = null
     var cardValid: Boolean? = null
 }
 
@@ -33,7 +33,7 @@ inline fun buildMoneyNode(init: MoneyNodeBuilder.() -> Unit): MoneyNode {
         name = builder.name,
         type = builder.type,
         keys = builder.keys,
-        cardId = builder.cardId,
+        cardTypeId = builder.cardTypeId,
         cardValid = builder.cardValid,
     )
 }

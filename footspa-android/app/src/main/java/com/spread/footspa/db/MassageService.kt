@@ -10,6 +10,7 @@ import java.math.BigDecimal
 data class MassageService(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     @ColumnInfo(name = "name") val name: String,
+    @ColumnInfo(name = "desc") val desc: String?,
     @ColumnInfo(name = "price") val price: BigDecimal,
     @ColumnInfo(name = "create_time") val createTime: Long
 )
