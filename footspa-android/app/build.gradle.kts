@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.jens.fuzzy)
     api(libs.androidx.ui)
     api(libs.androidx.ui.graphics)
     api(libs.androidx.material3)

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -80,10 +81,11 @@ fun AddMassageService(modifier: Modifier = Modifier) {
 fun ServiceList(modifier: Modifier, serviceList: List<MassageService>) {
     LazyColumn(modifier = modifier) {
         items(serviceList) {
-            Column(modifier = Modifier.padding(vertical = 5.dp)) {
+            Column {
                 Text("项目: ${it.name}")
                 Text("价格: ${it.price}")
                 Text("描述: ${it.desc}")
+                HorizontalDivider()
             }
         }
     }

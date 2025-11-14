@@ -2,11 +2,13 @@ package com.spread.footspa.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +29,8 @@ import com.spread.footspa.db.PEOPLE_TYPE_CUSTOMER
 import com.spread.footspa.db.PEOPLE_TYPE_EMPLOYEE
 import com.spread.footspa.db.PEOPLE_TYPE_EMPLOYER
 import com.spread.footspa.db.displayStr
+import com.spread.footspa.db.queryMoneyNode
+import com.spread.footspa.ui.common.MoneyNodeSearchInputSimple
 import com.spread.footspa.ui.common.PhoneNumberInput
 import com.spread.footspa.ui.common.SelectOneOptions
 import kotlinx.coroutines.Dispatchers
@@ -39,13 +43,13 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
         initialPage = 0,
         pageCount = { 2 }
     )
+    val scope = rememberCoroutineScope()
     HorizontalPager(
         modifier = modifier,
         state = pagerState,
     ) { page ->
         if (page == 0) {
             var nodeType by remember { mutableStateOf(MoneyNodeType.None) }
-            val scope = rememberCoroutineScope()
             val options = listOf(
                 PEOPLE_TYPE_EMPLOYER,
                 PEOPLE_TYPE_EMPLOYEE,
@@ -124,13 +128,42 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
                     peopleList.addAll(list)
                 }
             }
-            LazyColumn(modifier = modifier) {
-                items(peopleList) { people ->
-                    Column {
-                        Text(text = "姓名: ${people.name}")
-                        Text(text = "人员类型: ${people.type.displayStr}")
-                        Text(text = "电话: ${people.keys?.joinToString()}")
-                        HorizontalDivider()
+            val filteredList = remember { mutableStateListOf<MoneyNode>() }
+            var inSearch by remember { mutableStateOf(false) }
+            Column(modifier = modifier) {
+                val queryState = remember { TextFieldState() }
+                MoneyNodeSearchInputSimple(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    textFieldState = queryState,
+                    label = "搜人",
+                    onSearch = { query ->
+                        if (query.isBlank()) {
+                            filteredList.clear()
+                            inSearch = false
+                        } else {
+                            scope.launch(Dispatchers.IO) {
+                                inSearch = true
+                                val res = queryMoneyNode(query, peopleList)
+                                filteredList.clear()
+                                filteredList.addAll(res)
+                            }
+                        }
+                    }
+                )
+                LazyColumn {
+                    items(
+                        items =
+                            if (inSearch) filteredList
+                            else filteredList.takeIf { it.isNotEmpty() } ?: peopleList
+                    ) { people ->
+                        Column {
+                            Text(text = "姓名: ${people.name}")
+                            Text(text = "人员类型: ${people.type.displayStr}")
+                            Text(text = "电话: ${people.keys?.joinToString()}")
+                            HorizontalDivider()
+                        }
                     }
                 }
             }

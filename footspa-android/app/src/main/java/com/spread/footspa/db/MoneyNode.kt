@@ -3,6 +3,7 @@ package com.spread.footspa.db
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.frosch2010.fuzzywuzzy_kotlin.FuzzySearch
 
 @Entity(tableName = SQLConst.TABLE_NAME_MONEY_NODE)
 data class MoneyNode(
@@ -36,4 +37,40 @@ inline fun buildMoneyNode(init: MoneyNodeBuilder.() -> Unit): MoneyNode {
         cardTypeId = builder.cardTypeId,
         cardValid = builder.cardValid,
     )
+}
+
+/**
+ * Fuzzle search MoneyNodes by name and keys
+ */
+fun queryMoneyNode(
+    query: String,
+    nodes: List<MoneyNode>,
+    minScore: Int = 1,
+    top: Int = 10,
+    types: Set<MoneyNodeType> = emptySet()
+): List<MoneyNode> {
+    val thisTypeNodes = if (types.isEmpty()) nodes else nodes.filter { it.type in types }
+    val nameCandidates = FuzzySearch.extractAll(
+        query = query,
+        choices = thisTypeNodes.map { it.name }
+    )
+    val keyCandidates = FuzzySearch.extractAll(
+        query = query,
+        choices = thisTypeNodes.map { it.keys?.joinToString() ?: "" }
+    )
+    val allCandidatesDuplicated = (nameCandidates + keyCandidates).sortedByDescending { it.score }
+    val finalRes = mutableListOf<MoneyNode>()
+    val dedup = hashSetOf<Int>()
+    for (candidate in allCandidatesDuplicated) {
+        val index = candidate.index
+        val node = thisTypeNodes[index]
+        if (dedup.contains(index) || finalRes.contains(node) || candidate.score < minScore) {
+            continue
+        }
+        finalRes.add(node)
+        if (finalRes.size >= top) {
+            break
+        }
+    }
+    return finalRes
 }
