@@ -5,6 +5,7 @@ const val PEOPLE_TYPE_EMPLOYEE = "员工"
 const val PEOPLE_TYPE_CUSTOMER = "顾客"
 
 enum class MoneyNodeType(val str: String) {
+
     None(""),
     Public("public"),
     Outside("outside"),

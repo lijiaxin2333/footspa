@@ -22,7 +22,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,6 +39,7 @@ import com.spread.footspa.db.MassageService
 import com.spread.footspa.db.MoneyNode
 import com.spread.footspa.db.MoneyNodeType
 import com.spread.footspa.db.buildMoneyNode
+import com.spread.footspa.db.queryMassageService
 import com.spread.footspa.db.queryMoneyNode
 import com.spread.footspa.ui.common.MoneyNodeSearchInputSimple
 import com.spread.footspa.ui.common.PhoneNumberInput
@@ -65,29 +68,40 @@ private fun typeOf(str: String): ConsumptionType = when (str) {
 private class Consumption(
     type: ConsumptionType = ConsumptionType.None,
     customer: MoneyNode? = null,
+    card: MoneyNode? = null,
     money: BigDecimal = BigDecimal.ZERO,
     service: MassageService? = null,
     servant: MoneyNode? = null
 ) {
     var type by mutableStateOf(type)
     var customer by mutableStateOf(customer)
+    var card by mutableStateOf(card)
     var money by mutableStateOf(money)
     var service by mutableStateOf(service)
     var servant by mutableStateOf(servant)
-    var addCustomer by mutableStateOf(false)
+    val addMap = mutableStateMapOf<String, Boolean>()
+
+    fun needAdd(key: String) = addMap[key] ?: false
+
+    fun markNeedAdd(key: String, value: Boolean) {
+        addMap[key] = value
+    }
 }
 
 
 @Composable
 fun ConsumeScreen(modifier: Modifier = Modifier) {
     val consumptions = remember { mutableStateListOf(Consumption()) }
-    var dialogIndex by remember { mutableStateOf(-1) }
+    var customerDialogIndex by remember { mutableIntStateOf(-1) }
+    var cardDialogIndex by remember { mutableIntStateOf(-1) }
+    var serviceDialogIndex by remember { mutableIntStateOf(-1) }
+    var servantDialogIndex by remember { mutableIntStateOf(-1) }
     LazyColumn(modifier = modifier) {
         itemsIndexed(consumptions) { index, consumption ->
             OneConsumption(
                 consumption = consumption,
                 onClickCustomer = {
-                    dialogIndex = index
+                    customerDialogIndex = index
                 }
             )
             HorizontalDivider()
@@ -114,84 +128,52 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
         }
     }
     // TODO: must be outside of Dialog, otherwise UI not refresh, why???
-    val queryState = remember { TextFieldState() }
-    val scope = rememberCoroutineScope()
-    val filteredCustomer = remember { mutableStateListOf<MoneyNode>() }
-    if (dialogIndex in consumptions.indices) {
-        Dialog(
-            onDismissRequest = { dialogIndex = -1 },
-            properties = DialogProperties(
-                dismissOnBackPress = true,
-                dismissOnClickOutside = false
-            )
-        ) {
-            Column {
-                consumptions[dialogIndex].customer?.let {
-                    Text("选择顾客：${it.name}")
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MoneyNodeSearchInputSimple(
-                        modifier = Modifier.weight(1f),
-                        label = "搜索顾客",
-                        textFieldState = queryState,
-                        onSearch = { query ->
-                            if (query.isBlank()) {
-                                filteredCustomer.clear()
-                            }
-                            scope.launch(Dispatchers.IO) {
-                                val res = queryMoneyNode(
-                                    query = query,
-                                    nodes = FSDB.moneyNodeFlow.value,
-                                    types = setOf(MoneyNodeType.Customer)
-                                )
-                                withContext(Dispatchers.Main) {
-                                    filteredCustomer.clear()
-                                    filteredCustomer.addAll(res)
-                                }
-                            }
-                        }
-                    )
-                    OutlinedIconButton(
-                        modifier = Modifier.wrapContentSize(),
-                        onClick = {
-                            consumptions[dialogIndex].addCustomer = true
-                            dialogIndex = -1
-                        }
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                modifier = Modifier
-                                    .padding(start = 5.dp)
-                                    .align(Alignment.Center),
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "add customer"
-                            )
-                        }
-                    }
-                }
-                LazyColumn {
-                    items(filteredCustomer) { customer ->
-                        Text(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 5.dp)
-                                .clickable {
-                                    consumptions[dialogIndex].run {
-                                        this.customer = customer
-                                        this.addCustomer = false
-                                    }
-                                    dialogIndex = -1
-                                },
-                            text = customer.name + " " + customer.keys?.joinToString(),
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
+    val customerQueryState = remember { TextFieldState() }
+    val cardQueryState = remember { TextFieldState() }
+    val serviceQueryState = remember { TextFieldState() }
+    val servantQueryState = remember { TextFieldState() }
+    if (customerDialogIndex in consumptions.indices) {
+        QueryMoneyNodeDialog(
+            onDismissRequest = {
+                customerDialogIndex = -1
+            },
+            consumptions = consumptions,
+            index = customerDialogIndex,
+            queryType = MoneyNodeType.Customer,
+            queryState = customerQueryState
+        )
+    }
+    if (cardDialogIndex in consumptions.indices) {
+        QueryMoneyNodeDialog(
+            onDismissRequest = {
+                cardDialogIndex = -1
+            },
+            consumptions = consumptions,
+            index = cardDialogIndex,
+            queryType = MoneyNodeType.Card,
+            queryState = cardQueryState
+        )
+    }
+    if (serviceDialogIndex in consumptions.indices) {
+        QueryServiceDialog(
+            onDismissRequest = {
+                serviceDialogIndex = -1
+            },
+            consumptions = consumptions,
+            index = serviceDialogIndex,
+            queryState = serviceQueryState
+        )
+    }
+    if (servantDialogIndex in consumptions.indices) {
+        QueryMoneyNodeDialog(
+            onDismissRequest = {
+                servantDialogIndex = -1
+            },
+            consumptions = consumptions,
+            index = servantDialogIndex,
+            queryType = MoneyNodeType.Employee,
+            queryState = servantQueryState
+        )
     }
 }
 
@@ -221,7 +203,7 @@ private fun OneConsumption(
         ) {
             Text(text = "确定顾客信息")
         }
-        if (consumption.addCustomer) {
+        if (consumption.needAdd(MoneyNodeType.Customer.str)) {
             var nameInput by remember { mutableStateOf("") }
             val phoneNumbers = remember { mutableStateListOf("") }
             OutlinedTextField(
@@ -256,12 +238,179 @@ private fun OneConsumption(
                     type = MoneyNodeType.Customer
                     keys = pn
                 }
-                consumption.addCustomer = false
+                consumption.markNeedAdd(MoneyNodeType.Customer.str, false)
             }) { Text(text = "确定添加") }
         } else {
             consumption.customer?.let {
                 Text("姓名: ${it.name}")
                 Text("电话: ${it.keys?.joinToString()}")
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueryMoneyNodeDialog(
+    onDismissRequest: () -> Unit,
+    consumptions: List<Consumption>,
+    index: Int,
+    queryType: MoneyNodeType,
+    queryState: TextFieldState
+) {
+    val scope = rememberCoroutineScope()
+    val queryResult = remember { mutableStateListOf<MoneyNode>() }
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MoneyNodeSearchInputSimple(
+                    modifier = Modifier.weight(1f),
+                    label = "搜索",
+                    textFieldState = queryState,
+                    onSearch = { query ->
+                        if (query.isBlank()) {
+                            queryResult.clear()
+                        }
+                        scope.launch(Dispatchers.IO) {
+                            val res = queryMoneyNode(
+                                query = query,
+                                nodes = FSDB.moneyNodeFlow.value,
+                                types = setOf(queryType)
+                            )
+                            withContext(Dispatchers.Main) {
+                                queryResult.clear()
+                                queryResult.addAll(res)
+                            }
+                        }
+                    }
+                )
+                OutlinedIconButton(
+                    modifier = Modifier.wrapContentSize(),
+                    onClick = {
+                        consumptions[index].markNeedAdd(queryType.str, true)
+                        onDismissRequest()
+                    }
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            modifier = Modifier
+                                .padding(start = 5.dp)
+                                .align(Alignment.Center),
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "add"
+                        )
+                    }
+                }
+            }
+            LazyColumn {
+                items(queryResult) { customer ->
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp)
+                            .clickable {
+                                consumptions[index].run {
+                                    this.customer = customer
+                                    markNeedAdd(queryType.str, false)
+                                }
+                                onDismissRequest()
+                            },
+                        text = customer.name + " " + customer.keys?.joinToString(),
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueryServiceDialog(
+    onDismissRequest: () -> Unit,
+    consumptions: List<Consumption>,
+    index: Int,
+    queryState: TextFieldState
+) {
+    val scope = rememberCoroutineScope()
+    val queryResult = remember { mutableStateListOf<MassageService>() }
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Column {
+            consumptions[index].service?.let {
+                Text("选择：${it.name}")
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MoneyNodeSearchInputSimple(
+                    modifier = Modifier.weight(1f),
+                    label = "搜索",
+                    textFieldState = queryState,
+                    onSearch = { query ->
+                        if (query.isBlank()) {
+                            queryResult.clear()
+                        }
+                        scope.launch(Dispatchers.IO) {
+                            val res = queryMassageService(
+                                query = query,
+                                services = FSDB.massageServiceFlow.value
+                            )
+                            withContext(Dispatchers.Main) {
+                                queryResult.clear()
+                                queryResult.addAll(res)
+                            }
+                        }
+                    }
+                )
+                OutlinedIconButton(
+                    modifier = Modifier.wrapContentSize(),
+                    onClick = {
+                        consumptions[index].markNeedAdd(MassageService::class.java.name, true)
+                        onDismissRequest()
+                    }
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            modifier = Modifier
+                                .padding(start = 5.dp)
+                                .align(Alignment.Center),
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "add"
+                        )
+                    }
+                }
+            }
+            LazyColumn {
+                items(queryResult) { service ->
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp)
+                            .clickable {
+                                consumptions[index].run {
+                                    this.service = service
+                                    markNeedAdd(MassageService::class.java.name, false)
+                                }
+                                onDismissRequest()
+                            },
+                        text = service.name + " " + service.price.toPlainString() + " " + service.desc,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
