@@ -64,6 +64,9 @@ abstract class FSDB : RoomDatabase() {
             SQLConst.UNIQUE_INDEX_TYPE_PUBLIC
         )
 
+        suspend fun insertMoneyNode(vararg moneyNode: MoneyNode) {
+            dao.insertMoneyNode(*moneyNode)
+        }
 
         suspend fun insertCustomer(
             name: String,

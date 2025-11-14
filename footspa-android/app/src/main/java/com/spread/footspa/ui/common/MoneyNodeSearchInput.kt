@@ -1,8 +1,13 @@
 package com.spread.footspa.ui.common
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
@@ -38,6 +43,16 @@ fun MoneyNodeSearchInputSimple(
                     },
                     onSearch = {
                         onSearch(textFieldState.text.toString())
+                    },
+                    trailingIcon = {
+                        Icon(
+                            modifier = Modifier.clickable {
+                                textFieldState.clearText()
+                                onSearch(textFieldState.text.toString())
+                            },
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "clear"
+                        )
                     },
                     expanded = false,
                     onExpandedChange = {},
