@@ -1,6 +1,7 @@
 package com.spread.footspa.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -144,17 +146,32 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
             ) {
                 Row(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .clickable {
-                            consumptions.add(Consumption())
-                        },
-                    verticalAlignment = Alignment.CenterVertically
+                        .align(Alignment.Center),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Text(
-                        modifier = Modifier.padding(end = 5.dp),
-                        text = "新增一笔消费"
-                    )
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "添加")
+                    OutlinedButton(
+                        onClick = {
+                            consumptions.add(Consumption())
+                        }
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                modifier = Modifier.padding(end = 5.dp),
+                                text = "新增一笔消费"
+                            )
+                            Icon(imageVector = Icons.Default.Add, contentDescription = "添加")
+                        }
+                    }
+                    if (consumptions.all { it.ready }) {
+                        OutlinedButton(
+                            onClick = {
+
+                            }
+                        ) {
+                            Text(text = "提交所有消费")
+                        }
+                    }
                 }
             }
         }
@@ -281,6 +298,7 @@ private fun OneConsumption(
                                 finish = {
                                     finish()
                                     moneyFinish = true
+                                    consumption.ready = true
                                 }
                             )
                         }
