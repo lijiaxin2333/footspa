@@ -1,6 +1,8 @@
 package com.spread.footspa
 
 import android.app.Application
+import com.github.promeg.pinyinhelper.Pinyin
+import com.github.promeg.tinypinyin.lexicons.android.cncity.CnCityDict
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +29,7 @@ class MainApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Pinyin.init(Pinyin.newConfig().with(CnCityDict.getInstance(this)))
     }
 
 }

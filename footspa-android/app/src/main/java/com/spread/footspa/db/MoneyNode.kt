@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.frosch2010.fuzzywuzzy_kotlin.FuzzySearch
+import com.github.promeg.pinyinhelper.Pinyin
 
 @Entity(tableName = SQLConst.TABLE_NAME_MONEY_NODE)
 data class MoneyNode(
@@ -77,7 +78,12 @@ fun queryMoneyNode(
         query = query,
         choices = thisTypeNodes.map { it.keys?.joinToString() ?: "" }
     )
-    val allCandidatesDuplicated = (nameCandidates + keyCandidates).sortedByDescending { it.score }
+    val pinyinCandidates = FuzzySearch.extractAll(
+        query = query,
+        choices = thisTypeNodes.map { Pinyin.toPinyin(it.name, "") }
+    )
+    val allCandidatesDuplicated =
+        (nameCandidates + keyCandidates + pinyinCandidates).sortedByDescending { it.score }
     val finalRes = mutableListOf<MoneyNode>()
     val dedup = hashSetOf<Int>()
     for (candidate in allCandidatesDuplicated) {

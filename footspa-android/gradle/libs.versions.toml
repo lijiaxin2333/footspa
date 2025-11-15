@@ -23,6 +23,7 @@ runtimeAndroid = "1.9.1"
 coilCompose = "2.7.0"
 vico = "2.1.3"
 fuzzywuzzy-kotlin = "1.0.1"
+tinypinyin = "2.0.3"
 
 # @keep
 compileSdk = "36"
@@ -69,6 +70,8 @@ androidx-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomato
 androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmarkMacroJunit4" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 jens-fuzzy = { group = "com.github.jens-muenker", name = "fuzzywuzzy-kotlin", version.ref = "fuzzywuzzy-kotlin" }
+tinypinyin = { module = "com.github.promeg:tinypinyin", version.ref = "tinypinyin" }
+tinypinyin-dict = { module = "com.github.promeg:tinypinyin-lexicons-android-cncity", version.ref = "tinypinyin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

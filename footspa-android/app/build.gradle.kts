@@ -63,6 +63,8 @@ dependencies {
     api(libs.kotlinx.serialization.json)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.tinypinyin)
+    implementation(libs.tinypinyin.dict)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
