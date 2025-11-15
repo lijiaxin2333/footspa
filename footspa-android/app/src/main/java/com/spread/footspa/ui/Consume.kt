@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -39,17 +42,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.spread.footspa.common.displayStr
+import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.db.MassageService
 import com.spread.footspa.db.MoneyNode
 import com.spread.footspa.db.MoneyNodeType
 import com.spread.footspa.db.buildMoneyNode
+import com.spread.footspa.db.queryCard
 import com.spread.footspa.db.queryMassageService
 import com.spread.footspa.db.queryMoneyNode
+import com.spread.footspa.ui.card.ChooseCardType
+import com.spread.footspa.ui.common.InvalidCardChip
+import com.spread.footspa.ui.common.LegacyCardChip
 import com.spread.footspa.ui.common.MoneyExpr
 import com.spread.footspa.ui.common.MoneyInput2
 import com.spread.footspa.ui.common.MoneyInputState
 import com.spread.footspa.ui.common.MoneyNodeSearchInputSimple
+import com.spread.footspa.ui.common.NewNodeChip
 import com.spread.footspa.ui.common.PhoneNumberInput
 import com.spread.footspa.ui.common.SelectOneOptions
 import com.spread.footspa.ui.common.StepColumn
@@ -95,10 +104,10 @@ private class Consumption(
 
     var ready by mutableStateOf(false)
 
-    fun needAdd(key: String) = addMap[key] ?: false
+    fun needAdd(type: MoneyNodeType) = addMap[type.str] ?: false
 
-    fun markNeedAdd(key: String, value: Boolean) {
-        addMap[key] = value
+    fun markNeedAdd(type: MoneyNodeType, value: Boolean) {
+        addMap[type.str] = value
     }
 
     fun changeType(type: ConsumptionType) {
@@ -134,6 +143,9 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                 },
                 onClickServant = {
                     servantDialogIndex = index
+                },
+                onClickCard = {
+                    cardDialogIndex = index
                 }
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 5.dp))
@@ -234,7 +246,8 @@ private fun OneConsumption(
     consumption: Consumption,
     onClickCustomer: () -> Unit,
     onClickService: () -> Unit,
-    onClickServant: () -> Unit
+    onClickServant: () -> Unit,
+    onClickCard: () -> Unit
 ) {
     Column(modifier = modifier) {
         Text(text = "消费类型")
@@ -252,10 +265,10 @@ private fun OneConsumption(
         )
         when (consumption.type) {
             ConsumptionType.Purchase -> {
-                var customerFinish by mutableStateOf(false)
-                var serviceFinish by mutableStateOf(false)
-                var servantFinish by mutableStateOf(false)
-                var moneyFinish by mutableStateOf(false)
+                var customerFinish by remember { mutableStateOf(false) }
+                var serviceFinish by remember { mutableStateOf(false) }
+                var servantFinish by remember { mutableStateOf(false) }
+                var moneyFinish by remember { mutableStateOf(false) }
                 StepColumn(
                     stepsBuilder = {
                         add { finish ->
@@ -302,19 +315,49 @@ private fun OneConsumption(
                                 }
                             )
                         }
-                    },
-                    onAllStepsFinished = {
-
                     }
                 )
             }
 
             ConsumptionType.Deposit -> {
+                var customerFinish by remember { mutableStateOf(false) }
+                var cardFinish by remember { mutableStateOf(false) }
+                var moneyFinish by remember { mutableStateOf(false) }
                 StepColumn(
                     stepsBuilder = {
-                    },
-                    onAllStepsFinished = {
-
+                        add { finish ->
+                            CustomerInfo(
+                                consumption = consumption,
+                                onClickCustomer = onClickCustomer,
+                                isFinished = customerFinish,
+                                finish = {
+                                    finish()
+                                    customerFinish = true
+                                }
+                            )
+                        }
+                        add { finish ->
+                            CardInfo(
+                                consumption = consumption,
+                                onClickCard = onClickCard,
+                                isFinished = cardFinish,
+                                finish = {
+                                    finish()
+                                    cardFinish = true
+                                }
+                            )
+                        }
+                        add { finish ->
+                            MoneyInfo(
+                                consumption = consumption,
+                                isFinished = moneyFinish,
+                                finish = {
+                                    finish()
+                                    moneyFinish = true
+                                    consumption.ready = true
+                                }
+                            )
+                        }
                     }
                 )
             }
@@ -343,7 +386,7 @@ private fun CustomerInfo(
                 Text(text = "确定顾客信息")
             }
         }
-        if (consumption.needAdd(MoneyNodeType.Customer.str)) {
+        if (consumption.needAdd(MoneyNodeType.Customer)) {
             var nameInput by remember { mutableStateOf("") }
             val phoneNumbers = remember { mutableStateListOf("") }
             OutlinedTextField(
@@ -378,14 +421,20 @@ private fun CustomerInfo(
                     type = MoneyNodeType.Customer
                     keys = pn
                 }
-                consumption.markNeedAdd(MoneyNodeType.Customer.str, false)
+                consumption.markNeedAdd(MoneyNodeType.Customer, false)
             }) { Text(text = "确定添加") }
         } else {
-            val newCustomer = FSDB.moneyNodeFlow.value.find {
+            val nodes by FSDB.moneyNodeFlow.collectAsState()
+            val newCustomer = nodes.find {
                 consumption.customer == it
             } == null
             consumption.customer?.let {
-                Text("顾客姓名: ${it.name.concatNew(newCustomer)}")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("顾客姓名: ${it.name}")
+                    if (newCustomer) {
+                        NewNodeChip(MoneyNodeType.Customer)
+                    }
+                }
                 Text("顾客电话: ${it.keys?.joinToString()}")
                 finish()
             }
@@ -439,71 +488,13 @@ private fun ServiceInfo(
                 Text(text = "确定服务信息")
             }
         }
-        if (consumption.needAdd(MassageService::class.java.name)) {
-            var serviceNameInputText by remember { mutableStateOf("") }
-            var serviceDescInputText by remember { mutableStateOf("") }
-            val moneyInputState = remember { MoneyInputState() }
-            var expression by remember { mutableStateOf("") }
-            var value: BigDecimal? by remember { mutableStateOf(BigDecimal.ZERO) }
-            var err: String? by remember { mutableStateOf(null) }
-            LaunchedEffect(Unit) {
-                moneyInputState.expressionDataFlow.collect {
-                    expression = it.expr
-                    value = it.value
-                    err = it.err
-                }
+        consumption.service?.let {
+            Text("项目: ${it.name}")
+            Text("价格: ${it.price.displayStr}")
+            it.desc?.takeIf { d -> d.isNotBlank() }?.let { desc ->
+                Text(desc)
             }
-            Column {
-                OutlinedTextField(
-                    value = serviceNameInputText,
-                    onValueChange = {
-                        serviceNameInputText = it
-                    },
-                    label = { Text("项目名") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = serviceDescInputText,
-                    onValueChange = {
-                        serviceDescInputText = it
-                    },
-                    label = { Text("描述") },
-                    singleLine = false
-                )
-                MoneyExpr(
-                    label = "价格",
-                    expression = expression,
-                    initial = null,
-                    value = value,
-                    err = err
-                )
-                MoneyInput2(inputState = moneyInputState)
-                Button(onClick = {
-                    value?.let { price ->
-                        serviceNameInputText.takeIf { it.isNotBlank() }?.let { name ->
-                            val service = MassageService(
-                                name = name,
-                                desc = serviceDescInputText,
-                                price = price,
-                                createTime = System.currentTimeMillis()
-                            )
-                            consumption.service = service
-                            consumption.markNeedAdd(MassageService::class.java.name, false)
-                        }
-                    }
-                }) { Text(text = "确定添加") }
-            }
-        } else {
-            val newService = FSDB.massageServiceFlow.value.find {
-                consumption.service == it
-            } == null
-            consumption.service?.let {
-                Text("项目: ${it.name.concatNew(newService)}, ${it.price.displayStr}")
-                it.desc?.takeIf { d -> d.isNotBlank() }?.let { desc ->
-                    Text(desc)
-                }
-                finish()
-            }
+            finish()
         }
     }
 }
@@ -565,8 +556,111 @@ private fun MoneyInfo(
     }
 }
 
-private fun String.concatNew(new: Boolean): String {
-    return this + if (new) "(新)" else ""
+@Composable
+private fun CardInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    onClickCard: () -> Unit,
+    isFinished: Boolean,
+    finish: () -> Unit
+) {
+    Column(modifier = modifier) {
+        if (!isFinished) {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    onClickCard()
+                }
+            ) {
+                Text(text = "确定会员卡信息")
+            }
+        }
+        if (consumption.needAdd(MoneyNodeType.Card)) {
+            var selectedCardInfo: CardType? by remember { mutableStateOf(null) }
+            val phoneNumbers = remember { mutableStateListOf("") }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                item {
+                    ChooseCardType(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                    ) {
+                        selectedCardInfo = it
+                    }
+                }
+                item {
+                    Text(text = "联系电话:")
+                    PhoneNumberInput(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(),
+                        phoneNumbers = phoneNumbers,
+                        onPhoneNumberChange = { newNum, index ->
+                            phoneNumbers[index] = newNum
+                            if (newNum.isEmpty() && phoneNumbers.size > 1) {
+                                phoneNumbers.removeAt(index)
+                            }
+                        },
+                        onClickNewPhoneNumber = {
+                            phoneNumbers.add("")
+                        }
+                    )
+                }
+            }
+            Button(onClick = {
+                val cardInfo = selectedCardInfo ?: return@Button
+                consumption.card = buildMoneyNode {
+                    name = cardInfo.name
+                    type = MoneyNodeType.Card
+                    keys = phoneNumbers
+                    cardTypeId = cardInfo.id
+                    cardValid = true
+                }
+                consumption.markNeedAdd(MoneyNodeType.Card, false)
+            }) {
+                Text(text = "确定添加")
+            }
+        } else {
+            val cards by FSDB.moneyNodeFlow.collectAsState()
+            val newCard = cards.find {
+                consumption.card == it
+            } == null
+            LaunchedEffect(consumption.card) {
+                consumption.card?.let {
+
+                }
+            }
+            consumption.card?.let { card ->
+                val types by FSDB.cardTypeFlow.collectAsState()
+                val cardType = types.find { it.id == card.cardTypeId }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("卡名: ${card.name}")
+                    if (newCard) {
+                        NewNodeChip(MoneyNodeType.Card)
+                    }
+                    if (cardType?.legacy == true) {
+                        LegacyCardChip()
+                    }
+                    card.cardValid?.let { valid ->
+                        if (!valid) {
+                            InvalidCardChip()
+                        }
+                    }
+                }
+                Text("卡电话: ${card.keys?.joinToString()}")
+                cardType?.let {
+                    Text("起充: ${it.price.displayStr}")
+                    Text("折扣: ${it.discount}")
+                }
+                finish()
+            }
+        }
+    }
 }
 
 @Composable
@@ -579,6 +673,7 @@ private fun QueryMoneyNodeDialog(
     canAdd: Boolean = true,
 ) {
     val scope = rememberCoroutineScope()
+    val consumption = consumptions[index]
     val queryResult = remember { mutableStateListOf<MoneyNode>() }
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -601,14 +696,24 @@ private fun QueryMoneyNodeDialog(
                             queryResult.clear()
                         }
                         scope.launch(Dispatchers.IO) {
-                            val res = queryMoneyNode(
-                                query = query,
-                                nodes = FSDB.moneyNodeFlow.value,
-                                types = setOf(queryType)
-                            )
+                            val res = if (queryType == MoneyNodeType.Card) {
+                                consumption.customer?.let {
+                                    queryCard(
+                                        query = query,
+                                        customer = it
+                                    )
+                                }
+                            } else {
+                                queryMoneyNode(
+                                    query = query,
+                                    types = setOf(queryType),
+                                )
+                            }
                             withContext(Dispatchers.Main) {
                                 queryResult.clear()
-                                queryResult.addAll(res)
+                                if (res != null) {
+                                    queryResult.addAll(res)
+                                }
                             }
                         }
                     }
@@ -618,7 +723,7 @@ private fun QueryMoneyNodeDialog(
                         modifier = Modifier.wrapContentSize(),
                         shape = RectangleShape,
                         onClick = {
-                            consumptions[index].markNeedAdd(queryType.str, true)
+                            consumption.markNeedAdd(queryType, true)
                             onDismissRequest()
                         }
                     ) {
@@ -641,7 +746,7 @@ private fun QueryMoneyNodeDialog(
                             .fillMaxWidth()
                             .padding(vertical = 5.dp)
                             .clickable {
-                                consumptions[index].run {
+                                consumption.run {
                                     when (queryType) {
                                         MoneyNodeType.Customer -> this.customer = node
                                         MoneyNodeType.Card -> this.card = node
@@ -649,7 +754,7 @@ private fun QueryMoneyNodeDialog(
                                         else -> {}
                                     }
                                     if (canAdd) {
-                                        markNeedAdd(queryType.str, false)
+                                        markNeedAdd(queryType, false)
                                     }
                                 }
                                 onDismissRequest()
@@ -672,6 +777,7 @@ private fun QueryServiceDialog(
 ) {
     val scope = rememberCoroutineScope()
     val queryResult = remember { mutableStateListOf<MassageService>() }
+    val massageServices by FSDB.massageServiceFlow.collectAsState()
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
@@ -695,7 +801,7 @@ private fun QueryServiceDialog(
                         scope.launch(Dispatchers.IO) {
                             val res = queryMassageService(
                                 query = query,
-                                services = FSDB.massageServiceFlow.value
+                                services = massageServices
                             )
                             withContext(Dispatchers.Main) {
                                 queryResult.clear()
@@ -704,23 +810,6 @@ private fun QueryServiceDialog(
                         }
                     }
                 )
-                OutlinedIconButton(
-                    modifier = Modifier.wrapContentSize(),
-                    onClick = {
-                        consumptions[index].markNeedAdd(MassageService::class.java.name, true)
-                        onDismissRequest()
-                    }
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            modifier = Modifier
-                                .padding(start = 5.dp)
-                                .align(Alignment.Center),
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "add"
-                        )
-                    }
-                }
             }
             LazyColumn {
                 items(queryResult) { service ->
@@ -731,7 +820,6 @@ private fun QueryServiceDialog(
                             .clickable {
                                 consumptions[index].run {
                                     this.service = service
-                                    markNeedAdd(MassageService::class.java.name, false)
                                 }
                                 onDismissRequest()
                             },

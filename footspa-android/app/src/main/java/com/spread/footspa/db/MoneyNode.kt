@@ -68,28 +68,30 @@ inline fun buildMoneyNode(init: MoneyNodeBuilder.() -> Unit): MoneyNode {
  */
 suspend fun CoroutineScope.queryMoneyNode(
     query: String,
-    nodes: List<MoneyNode>,
     minScore: Int = 1,
     top: Int = 10,
-    types: Set<MoneyNodeType> = emptySet()
+    types: Set<MoneyNodeType> = emptySet(),
+    filter: ((MoneyNode) -> Boolean)? = null
 ): List<MoneyNode> {
+    val nodes = FSDB.moneyNodeFlow.value
     val thisTypeNodes = if (types.isEmpty()) nodes else nodes.filter { it.type in types }
+    val choices = if (filter == null) thisTypeNodes else thisTypeNodes.filter(filter)
     val nameCandidates = async(Dispatchers.IO) {
         FuzzySearch.extractAll(
             query = query,
-            choices = thisTypeNodes.map { it.name }
+            choices = choices.map { it.name }
         )
     }
     val keyCandidates = async(Dispatchers.IO) {
         FuzzySearch.extractAll(
             query = query,
-            choices = thisTypeNodes.map { it.keys?.joinToString() ?: "" }
+            choices = choices.map { it.keys?.joinToString() ?: "" }
         )
     }
     val pinyinCandidates = async(Dispatchers.IO) {
         FuzzySearch.extractAll(
             query = query,
-            choices = thisTypeNodes.map {
+            choices = choices.map {
                 Pinyin.toPinyin(it.name, "").lowercase(Locale.getDefault())
             }
         )
@@ -101,7 +103,77 @@ suspend fun CoroutineScope.queryMoneyNode(
     val dedup = hashSetOf<Int>()
     for (candidate in allCandidatesDuplicated) {
         val index = candidate.index
-        val node = thisTypeNodes[index]
+        val node = choices[index]
+        if (dedup.contains(index) || finalRes.contains(node) || candidate.score < minScore) {
+            continue
+        }
+        finalRes.add(node)
+        if (finalRes.size >= top) {
+            break
+        }
+    }
+    return finalRes
+}
+
+
+/**
+ * max return size: customer's card count + top
+ */
+suspend fun CoroutineScope.queryCard(
+    query: String,
+    customer: MoneyNode,
+    minScore: Int = 1,
+    top: Int = 10
+): List<MoneyNode> {
+    val nodes = FSDB.moneyNodeFlow.value
+    val choices = nodes.filter { it.type == MoneyNodeType.Card }
+    if (choices.isEmpty()) {
+        return emptyList()
+    }
+    val customerCandidates = run {
+        val bills = FSDB.billFlow.value
+        val l = mutableListOf<MoneyNode>()
+        for (bill in bills) {
+            if (bill.fromId == customer.id) {
+                val node = choices.find { it.id == bill.toId }
+                if (node != null && node.type == MoneyNodeType.Card && node.cardValid == true) {
+                    l.add(node)
+                }
+            }
+        }
+        l
+    }
+    if (query.isEmpty()) {
+        return customerCandidates
+    }
+    val phoneNumberCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = customerCandidates.map { it.keys?.joinToString() ?: "" }
+        )
+    }
+    val cardNameCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = customerCandidates.map { it.name }
+        )
+    }
+    val cardPinyinCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = customerCandidates.map {
+                Pinyin.toPinyin(it.name, "").lowercase(Locale.getDefault())
+            }
+        )
+    }
+    val allCandidatesDuplicated =
+        (phoneNumberCandidates.await() + cardNameCandidates.await() + cardPinyinCandidates.await())
+            .sortedByDescending { it.score }
+    val finalRes = mutableListOf<MoneyNode>()
+    val dedup = hashSetOf<Int>()
+    for (candidate in allCandidatesDuplicated) {
+        val index = candidate.index
+        val node = choices[index]
         if (dedup.contains(index) || finalRes.contains(node) || candidate.score < minScore) {
             continue
         }

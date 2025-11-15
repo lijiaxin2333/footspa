@@ -25,9 +25,9 @@ import androidx.compose.ui.Modifier
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.db.MoneyNode
 import com.spread.footspa.db.MoneyNodeType
-import com.spread.footspa.db.PEOPLE_TYPE_CUSTOMER
-import com.spread.footspa.db.PEOPLE_TYPE_EMPLOYEE
-import com.spread.footspa.db.PEOPLE_TYPE_EMPLOYER
+import com.spread.footspa.db.NODE_TYPE_CUSTOMER
+import com.spread.footspa.db.NODE_TYPE_EMPLOYEE
+import com.spread.footspa.db.NODE_TYPE_EMPLOYER
 import com.spread.footspa.db.displayStr
 import com.spread.footspa.db.queryMoneyNode
 import com.spread.footspa.ui.common.MoneyNodeSearchInputSimple
@@ -51,9 +51,9 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
         if (page == 0) {
             var nodeType by remember { mutableStateOf(MoneyNodeType.None) }
             val options = listOf(
-                PEOPLE_TYPE_EMPLOYER,
-                PEOPLE_TYPE_EMPLOYEE,
-                PEOPLE_TYPE_CUSTOMER
+                NODE_TYPE_EMPLOYER,
+                NODE_TYPE_EMPLOYEE,
+                NODE_TYPE_CUSTOMER
             )
             val phoneNumbers = remember { mutableStateListOf("") }
             var nameInput by remember { mutableStateOf("") }
@@ -64,9 +64,9 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
                     options = options,
                     onOptionSelected = {
                         nodeType = when (it) {
-                            PEOPLE_TYPE_EMPLOYER -> MoneyNodeType.Employer
-                            PEOPLE_TYPE_EMPLOYEE -> MoneyNodeType.Employee
-                            PEOPLE_TYPE_CUSTOMER -> MoneyNodeType.Customer
+                            NODE_TYPE_EMPLOYER -> MoneyNodeType.Employer
+                            NODE_TYPE_EMPLOYEE -> MoneyNodeType.Employee
+                            NODE_TYPE_CUSTOMER -> MoneyNodeType.Customer
                             else -> MoneyNodeType.None
                         }
                     }
@@ -115,14 +115,15 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
             }
         } else {
             val peopleList = remember { mutableStateListOf<MoneyNode>() }
+            val peopleTypes = setOf(
+                MoneyNodeType.Employee,
+                MoneyNodeType.Employer,
+                MoneyNodeType.Customer
+            )
             LaunchedEffect(Unit) {
                 FSDB.moneyNodeFlow.collect { moneyNodes ->
                     val list = moneyNodes.filter {
-                        it.type in setOf(
-                            MoneyNodeType.Employee,
-                            MoneyNodeType.Employer,
-                            MoneyNodeType.Customer
-                        )
+                        it.type in peopleTypes
                     }
                     peopleList.clear()
                     peopleList.addAll(list)
@@ -145,7 +146,10 @@ fun PeopleScreen(modifier: Modifier = Modifier) {
                         } else {
                             scope.launch(Dispatchers.IO) {
                                 inSearch = true
-                                val res = queryMoneyNode(query, peopleList)
+                                val res = queryMoneyNode(
+                                    query = query,
+                                    types = peopleTypes
+                                )
                                 filteredList.clear()
                                 filteredList.addAll(res)
                             }

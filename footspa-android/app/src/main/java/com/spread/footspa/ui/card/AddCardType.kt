@@ -8,9 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Warning
@@ -34,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.spread.footspa.common.displayStr
 import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
@@ -104,13 +102,12 @@ fun CardTypeList(
     onCardInfoClick: ((CardType) -> Unit)? = null
 ) {
     var selectedCardInfo by remember { mutableStateOf<CardType?>(null) }
-    LazyColumn(modifier = modifier) {
-        items(cardInfoList.size) { index ->
-            val info = cardInfoList[index]
+    Column(modifier = modifier) {
+        for (info in cardInfoList) {
             CardInfoItem(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(75.dp),
+                    .wrapContentHeight(),
                 cardInfo = info,
                 isSelected = selectedCardInfo == info,
                 onCardInfoClick = {
