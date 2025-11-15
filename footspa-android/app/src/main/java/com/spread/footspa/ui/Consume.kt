@@ -713,6 +713,35 @@ private fun QueryMoneyNodeDialog(
     val scope = rememberCoroutineScope()
     val consumption = consumptions[index]
     val queryResult = remember { mutableStateListOf<MoneyNode>() }
+    val search: (query: String) -> Unit = { query ->
+        if (query.isBlank()) {
+            queryResult.clear()
+        }
+        scope.launch(Dispatchers.IO) {
+            val res = if (queryType == MoneyNodeType.Card) {
+                consumption.customer?.let {
+                    queryCard(
+                        query = query,
+                        customer = it
+                    )
+                }
+            } else {
+                queryMoneyNode(
+                    query = query,
+                    types = setOf(queryType),
+                )
+            }
+            withContext(Dispatchers.Main) {
+                queryResult.clear()
+                if (res != null) {
+                    queryResult.addAll(res)
+                }
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        search(queryState.text.toString())
+    }
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
@@ -729,32 +758,7 @@ private fun QueryMoneyNodeDialog(
                     modifier = Modifier.weight(1f),
                     label = "搜索",
                     textFieldState = queryState,
-                    onSearch = { query ->
-                        if (query.isBlank()) {
-                            queryResult.clear()
-                        }
-                        scope.launch(Dispatchers.IO) {
-                            val res = if (queryType == MoneyNodeType.Card) {
-                                consumption.customer?.let {
-                                    queryCard(
-                                        query = query,
-                                        customer = it
-                                    )
-                                }
-                            } else {
-                                queryMoneyNode(
-                                    query = query,
-                                    types = setOf(queryType),
-                                )
-                            }
-                            withContext(Dispatchers.Main) {
-                                queryResult.clear()
-                                if (res != null) {
-                                    queryResult.addAll(res)
-                                }
-                            }
-                        }
-                    }
+                    onSearch = search
                 )
                 if (canAdd) {
                     OutlinedIconButton(
@@ -816,6 +820,24 @@ private fun QueryServiceDialog(
     val scope = rememberCoroutineScope()
     val queryResult = remember { mutableStateListOf<MassageService>() }
     val massageServices by FSDB.massageServiceFlow.collectAsState()
+    val search: (query: String) -> Unit = { query ->
+        if (query.isBlank()) {
+            queryResult.clear()
+        }
+        scope.launch(Dispatchers.IO) {
+            val res = queryMassageService(
+                query = query,
+                services = massageServices
+            )
+            withContext(Dispatchers.Main) {
+                queryResult.clear()
+                queryResult.addAll(res)
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        search(queryState.text.toString())
+    }
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
@@ -832,21 +854,7 @@ private fun QueryServiceDialog(
                     modifier = Modifier.weight(1f),
                     label = "搜索",
                     textFieldState = queryState,
-                    onSearch = { query ->
-                        if (query.isBlank()) {
-                            queryResult.clear()
-                        }
-                        scope.launch(Dispatchers.IO) {
-                            val res = queryMassageService(
-                                query = query,
-                                services = massageServices
-                            )
-                            withContext(Dispatchers.Main) {
-                                queryResult.clear()
-                                queryResult.addAll(res)
-                            }
-                        }
-                    }
+                    onSearch = search
                 )
             }
             LazyColumn {
