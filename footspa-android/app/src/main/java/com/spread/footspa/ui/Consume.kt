@@ -103,6 +103,7 @@ private class Consumption {
     var money by mutableStateOf<BigDecimal?>(null)
     var service by mutableStateOf<MassageService?>(null)
     var servant by mutableStateOf<MoneyNode?>(null)
+    var third by mutableStateOf<MoneyNode?>(null)
     var remark by mutableStateOf<String?>(null)
     val addMap = mutableStateMapOf<String, Boolean>()
     var showMoneyInput by mutableStateOf(false)
@@ -154,6 +155,9 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                     },
                     onClickServant = {
                         servantDialogIndex = index
+                    },
+                    onClickThirdParty = {
+                        thirdDialogIndex = index
                     },
                     onClickCard = {
                         cardDialogIndex = index
@@ -258,6 +262,17 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
             canAdd = false
         )
     }
+    if (thirdDialogIndex in consumptions.indices) {
+        QueryMoneyNodeDialog(
+            onDismissRequest = {
+                thirdDialogIndex = -1
+            },
+            consumptions = consumptions,
+            index = thirdDialogIndex,
+            queryType = MoneyNodeType.Third,
+            queryState = thirdQueryState
+        )
+    }
 }
 
 @Composable
@@ -267,6 +282,7 @@ private fun OneConsumption(
     onClickCustomer: () -> Unit,
     onClickService: () -> Unit,
     onClickServant: () -> Unit,
+    onClickThirdParty: () -> Unit,
     onClickCard: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -483,6 +499,82 @@ private fun OneConsumption(
                 }
             }
 
+            ConsumptionType.ThirdParty -> {
+                var customerFinish by remember { mutableStateOf(false) }
+                var serviceFinish by remember { mutableStateOf(false) }
+                var servantFinish by remember { mutableStateOf(false) }
+                var thirdPartyFinish by remember { mutableStateOf(false) }
+                var moneyFinish by remember { mutableStateOf(false) }
+                var remarkFinish by remember { mutableStateOf(false) }
+                StepColumn {
+                    add { finish ->
+                        CustomerInfo(
+                            consumption = consumption,
+                            onClickCustomer = onClickCustomer,
+                            isFinished = customerFinish,
+                            finish = {
+                                finish()
+                                customerFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        ServiceInfo(
+                            consumption = consumption,
+                            onClickService = onClickService,
+                            isFinished = serviceFinish,
+                            finish = {
+                                finish()
+                                serviceFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        ServantInfo(
+                            consumption = consumption,
+                            onClickServant = onClickServant,
+                            isFinished = servantFinish,
+                            finish = {
+                                finish()
+                                servantFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        ThirdPartyInfo(
+                            consumption = consumption,
+                            onClickThirdParty = onClickThirdParty,
+                            isFinished = thirdPartyFinish,
+                            finish = {
+                                finish()
+                                thirdPartyFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        MoneyInfo(
+                            consumption = consumption,
+                            isFinished = moneyFinish,
+                            finish = {
+                                finish()
+                                moneyFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        RemarkInfo(
+                            consumption = consumption,
+                            isFinished = remarkFinish,
+                            finish = {
+                                finish()
+                                remarkFinish = true
+                                consumption.ready = true
+                            }
+                        )
+                    }
+                }
+            }
+
             else -> {}
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -612,6 +704,56 @@ private fun ServantInfo(
             Text("员工姓名: ${it.name}")
             Text("员工电话: ${it.keys?.joinToString()}")
             finish()
+        }
+    }
+}
+
+@Composable
+private fun ThirdPartyInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    onClickThirdParty: () -> Unit,
+    isFinished: Boolean,
+    finish: () -> Unit
+) {
+    Column(modifier = modifier) {
+        if (!isFinished) {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    onClickThirdParty()
+                }
+            ) {
+                Text(text = "确定三方平台信息")
+            }
+        }
+        if (consumption.needAdd(MoneyNodeType.Third)) {
+            var nameInput by remember { mutableStateOf("") }
+            Row(modifier = modifier) {
+                EasyTextField(
+                    modifier = Modifier.weight(1f),
+                    value = nameInput,
+                    onValueChange = {
+                        nameInput = it
+                    }
+                )
+                TextButton(
+                    onClick = {
+                        consumption.third = buildMoneyNode {
+                            this.name = nameInput
+                            this.type = MoneyNodeType.Third
+                        }
+                        consumption.markNeedAdd(MoneyNodeType.Third, false)
+                    }
+                ) {
+                    Text(text = "确定")
+                }
+            }
+        } else {
+            consumption.third?.let {
+                Text(text = "三方平台: ${it.name}")
+                finish()
+            }
         }
     }
 }
@@ -933,6 +1075,7 @@ private fun QueryMoneyNodeDialog(
                                         MoneyNodeType.Customer -> this.customer = node
                                         MoneyNodeType.Card -> this.card = node
                                         MoneyNodeType.Employee -> this.servant = node
+                                        MoneyNodeType.Third -> this.third = node
                                         else -> {}
                                     }
                                     if (canAdd) {
