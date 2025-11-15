@@ -5,6 +5,10 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.frosch2010.fuzzywuzzy_kotlin.FuzzySearch
 import com.github.promeg.pinyinhelper.Pinyin
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import java.util.Locale
 
 @Entity(tableName = SQLConst.TABLE_NAME_MONEY_NODE)
 data class MoneyNode(
@@ -62,7 +66,7 @@ inline fun buildMoneyNode(init: MoneyNodeBuilder.() -> Unit): MoneyNode {
 /**
  * Fuzzle search MoneyNodes by name and keys
  */
-fun queryMoneyNode(
+suspend fun CoroutineScope.queryMoneyNode(
     query: String,
     nodes: List<MoneyNode>,
     minScore: Int = 1,
@@ -70,20 +74,29 @@ fun queryMoneyNode(
     types: Set<MoneyNodeType> = emptySet()
 ): List<MoneyNode> {
     val thisTypeNodes = if (types.isEmpty()) nodes else nodes.filter { it.type in types }
-    val nameCandidates = FuzzySearch.extractAll(
-        query = query,
-        choices = thisTypeNodes.map { it.name }
-    )
-    val keyCandidates = FuzzySearch.extractAll(
-        query = query,
-        choices = thisTypeNodes.map { it.keys?.joinToString() ?: "" }
-    )
-    val pinyinCandidates = FuzzySearch.extractAll(
-        query = query,
-        choices = thisTypeNodes.map { Pinyin.toPinyin(it.name, "") }
-    )
+    val nameCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = thisTypeNodes.map { it.name }
+        )
+    }
+    val keyCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = thisTypeNodes.map { it.keys?.joinToString() ?: "" }
+        )
+    }
+    val pinyinCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = thisTypeNodes.map {
+                Pinyin.toPinyin(it.name, "").lowercase(Locale.getDefault())
+            }
+        )
+    }
     val allCandidatesDuplicated =
-        (nameCandidates + keyCandidates + pinyinCandidates).sortedByDescending { it.score }
+        (nameCandidates.await() + keyCandidates.await() + pinyinCandidates.await())
+            .sortedByDescending { it.score }
     val finalRes = mutableListOf<MoneyNode>()
     val dedup = hashSetOf<Int>()
     for (candidate in allCandidatesDuplicated) {

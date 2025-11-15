@@ -4,6 +4,9 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.frosch2010.fuzzywuzzy_kotlin.FuzzySearch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import java.math.BigDecimal
 
 
@@ -16,26 +19,33 @@ data class MassageService(
     @ColumnInfo(name = "create_time") val createTime: Long
 )
 
-fun queryMassageService(
+suspend fun CoroutineScope.queryMassageService(
     query: String,
     services: List<MassageService>,
     minScore: Int = 1,
     top: Int = 10
 ): List<MassageService> {
-    val nameCandidates = FuzzySearch.extractAll(
-        query = query,
-        choices = services.map { it.name }
-    )
-    val descCandidates = FuzzySearch.extractAll(
-        query = query,
-        choices = services.map { it.desc ?: "" }
-    )
-    val priceCandidates = FuzzySearch.extractAll(
-        query = query,
-        choices = services.map { it.price.toPlainString() }
-    )
+    val nameCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = services.map { it.name }
+        )
+    }
+    val descCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = services.map { it.desc ?: "" }
+        )
+    }
+    val priceCandidates = async(Dispatchers.IO) {
+        FuzzySearch.extractAll(
+            query = query,
+            choices = services.map { it.price.toPlainString() }
+        )
+    }
     val allCandidatesDuplicated =
-        (nameCandidates + descCandidates + priceCandidates).sortedByDescending { it.score }
+        (nameCandidates.await() + descCandidates.await() + priceCandidates.await())
+            .sortedByDescending { it.score }
     val finalRes = mutableListOf<MassageService>()
     val dedup = hashSetOf<Int>()
     for (candidate in allCandidatesDuplicated) {
