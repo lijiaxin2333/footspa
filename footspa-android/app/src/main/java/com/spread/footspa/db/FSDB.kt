@@ -57,12 +57,21 @@ abstract class FSDB : RoomDatabase() {
 
         val billFlow = dao.listenToAllBills().asApplicationStateFlow(emptyList())
 
-        val cardInfoFlow = dao.listenToAllCardInfo().asApplicationStateFlow(emptyList())
+        val cardTypeFlow = dao.listenToAllCardTypes().asApplicationStateFlow(emptyList())
 
         private val sqlist = listOf(
             SQLConst.UNIQUE_INDEX_TYPE_OUTSIDE,
             SQLConst.UNIQUE_INDEX_TYPE_PUBLIC
         )
+
+        fun findCardType(card: MoneyNode): CardType? {
+            if (card.cardTypeId == null) {
+                return null
+            }
+            val type = cardTypeFlow.value.find { it.id == card.cardTypeId }
+            return type
+        }
+
 
         suspend fun insertMoneyNode(vararg moneyNode: MoneyNode) {
             dao.insertMoneyNode(*moneyNode)

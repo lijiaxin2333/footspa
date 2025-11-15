@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.spread.footspa.common.displayStr
 import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.ui.common.IconConstants
@@ -59,7 +60,7 @@ fun CardTypeManagementScreen(
 
     LaunchedEffect(Unit) {
         scope.launch(Dispatchers.IO) {
-            FSDB.cardInfoFlow.collectLatest {
+            FSDB.cardTypeFlow.collectLatest {
                 cardInfoList.clear()
                 cardInfoList.addAll(it)
             }
@@ -147,7 +148,7 @@ fun CardInfoItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = "卡类: ${cardInfo.name}")
-                Text(text = "${cardInfo.price.toPlainString()}起充")
+                Text(text = "${cardInfo.price.displayStr}起充")
                 Text(text = "${cardInfo.discount}折")
             }
         }

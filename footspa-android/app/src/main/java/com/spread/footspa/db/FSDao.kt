@@ -33,7 +33,7 @@ abstract class FSDao {
     abstract fun listenToAllBills(): Flow<List<Bill>>
 
     @Query("SELECT * FROM ${SQLConst.TABLE_NAME_CARD_TYPE}")
-    abstract fun listenToAllCardInfo(): Flow<List<CardType>>
+    abstract fun listenToAllCardTypes(): Flow<List<CardType>>
 
 
     fun checkDBHealthy(): Boolean {

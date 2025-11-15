@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -31,9 +32,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.spread.footspa.common.displayStr
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.db.MassageService
 import com.spread.footspa.db.MoneyNode
@@ -41,11 +44,14 @@ import com.spread.footspa.db.MoneyNodeType
 import com.spread.footspa.db.buildMoneyNode
 import com.spread.footspa.db.queryMassageService
 import com.spread.footspa.db.queryMoneyNode
+import com.spread.footspa.ui.common.MoneyExpr
+import com.spread.footspa.ui.common.MoneyInput2
+import com.spread.footspa.ui.common.MoneyInputState
 import com.spread.footspa.ui.common.MoneyNodeSearchInputSimple
 import com.spread.footspa.ui.common.PhoneNumberInput
 import com.spread.footspa.ui.common.SelectOneOptions
+import com.spread.footspa.ui.common.StepColumn
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
@@ -97,20 +103,29 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
     var cardDialogIndex by remember { mutableIntStateOf(-1) }
     var serviceDialogIndex by remember { mutableIntStateOf(-1) }
     var servantDialogIndex by remember { mutableIntStateOf(-1) }
+    var thirdDialogIndex by remember { mutableIntStateOf(-1) }
     LazyColumn(modifier = modifier) {
         itemsIndexed(consumptions) { index, consumption ->
             OneConsumption(
                 consumption = consumption,
                 onClickCustomer = {
                     customerDialogIndex = index
+                },
+                onClickService = {
+                    serviceDialogIndex = index
+                },
+                onClickServant = {
+                    servantDialogIndex = index
                 }
             )
-            HorizontalDivider()
+            HorizontalDivider(modifier = Modifier.padding(vertical = 5.dp))
         }
         item {
-            Box(modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+            ) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -133,6 +148,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
     val cardQueryState = remember { TextFieldState() }
     val serviceQueryState = remember { TextFieldState() }
     val servantQueryState = remember { TextFieldState() }
+    val thirdQueryState = remember { TextFieldState() }
     if (customerDialogIndex in consumptions.indices) {
         QueryMoneyNodeDialog(
             onDismissRequest = {
@@ -173,7 +189,8 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
             consumptions = consumptions,
             index = servantDialogIndex,
             queryType = MoneyNodeType.Employee,
-            queryState = servantQueryState
+            queryState = servantQueryState,
+            canAdd = false
         )
     }
 }
@@ -182,7 +199,9 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
 private fun OneConsumption(
     modifier: Modifier = Modifier,
     consumption: Consumption,
-    onClickCustomer: () -> Unit
+    onClickCustomer: () -> Unit,
+    onClickService: () -> Unit,
+    onClickServant: () -> Unit
 ) {
     Column(modifier = modifier) {
         Text(text = "消费类型")
@@ -198,6 +217,46 @@ private fun OneConsumption(
                 consumption.type = typeOf(it)
             }
         )
+        when (consumption.type) {
+            ConsumptionType.Purchase -> {
+                StepColumn {
+                    add { finish ->
+                        CustomerInfo(
+                            consumption = consumption,
+                            onClickCustomer = onClickCustomer,
+                            finish = finish
+                        )
+                    }
+                    add { finish ->
+                        ServiceInfo(
+                            consumption = consumption,
+                            onClickService = onClickService,
+                            finish = finish
+                        )
+                    }
+                    add { finish ->
+                        ServantInfo(
+                            consumption = consumption,
+                            onClickServant = onClickServant,
+                            finish = finish
+                        )
+                    }
+                }
+            }
+
+            else -> {}
+        }
+    }
+}
+
+@Composable
+private fun CustomerInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    onClickCustomer: () -> Unit,
+    finish: () -> Unit
+) {
+    Column(modifier = modifier) {
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = onClickCustomer
@@ -246,11 +305,121 @@ private fun OneConsumption(
                 consumption.customer == it
             } == null
             consumption.customer?.let {
-                Text("姓名: ${it.name}" + if (newCustomer) "(新)" else "")
-                Text("电话: ${it.keys?.joinToString()}")
+                Text("顾客姓名: ${it.name.concatNew(newCustomer)}")
+                Text("顾客电话: ${it.keys?.joinToString()}")
+                finish()
             }
         }
     }
+}
+
+@Composable
+private fun ServantInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    onClickServant: () -> Unit,
+    finish: () -> Unit
+) {
+    Column(modifier = modifier) {
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onClickServant,
+        ) {
+            Text(text = "确定服务员工信息")
+        }
+        consumption.servant?.let {
+            Text("员工姓名: ${it.name}")
+            Text("员工电话: ${it.keys?.joinToString()}")
+            finish()
+        }
+    }
+}
+
+@Composable
+private fun ServiceInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    onClickService: () -> Unit,
+    finish: () -> Unit
+) {
+    Column(modifier = modifier) {
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onClickService
+        ) {
+            Text(text = "确定服务信息")
+        }
+        if (consumption.needAdd(MassageService::class.java.name)) {
+            var serviceNameInputText by remember { mutableStateOf("") }
+            var serviceDescInputText by remember { mutableStateOf("") }
+            val moneyInputState = remember { MoneyInputState() }
+            var expression by remember { mutableStateOf("") }
+            var value: BigDecimal? by remember { mutableStateOf(BigDecimal.ZERO) }
+            var err: String? by remember { mutableStateOf(null) }
+            LaunchedEffect(Unit) {
+                moneyInputState.expressionDataFlow.collect {
+                    expression = it.expr
+                    value = it.value
+                    err = it.err
+                }
+            }
+            Column {
+                OutlinedTextField(
+                    value = serviceNameInputText,
+                    onValueChange = {
+                        serviceNameInputText = it
+                    },
+                    label = { Text("项目名") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = serviceDescInputText,
+                    onValueChange = {
+                        serviceDescInputText = it
+                    },
+                    label = { Text("描述") },
+                    singleLine = false
+                )
+                MoneyExpr(
+                    label = "价格",
+                    expression = expression,
+                    initial = null,
+                    value = value,
+                    err = err
+                )
+                MoneyInput2(inputState = moneyInputState)
+                Button(onClick = {
+                    value?.let { price ->
+                        serviceNameInputText.takeIf { it.isNotBlank() }?.let { name ->
+                            val service = MassageService(
+                                name = name,
+                                desc = serviceDescInputText,
+                                price = price,
+                                createTime = System.currentTimeMillis()
+                            )
+                            consumption.service = service
+                            consumption.markNeedAdd(MassageService::class.java.name, false)
+                        }
+                    }
+                }) { Text(text = "确定添加") }
+            }
+        } else {
+            val newService = FSDB.massageServiceFlow.value.find {
+                consumption.service == it
+            } == null
+            consumption.service?.let {
+                Text("项目: ${it.name.concatNew(newService)}, ${it.price.displayStr}")
+                it.desc?.takeIf { d -> d.isNotBlank() }?.let { desc ->
+                    Text(desc)
+                }
+                finish()
+            }
+        }
+    }
+}
+
+private fun String.concatNew(new: Boolean): String {
+    return this + if (new) "(新)" else ""
 }
 
 @Composable
@@ -259,7 +428,8 @@ private fun QueryMoneyNodeDialog(
     consumptions: List<Consumption>,
     index: Int,
     queryType: MoneyNodeType,
-    queryState: TextFieldState
+    queryState: TextFieldState,
+    canAdd: Boolean = true,
 ) {
     val scope = rememberCoroutineScope()
     val queryResult = remember { mutableStateListOf<MoneyNode>() }
@@ -296,38 +466,48 @@ private fun QueryMoneyNodeDialog(
                         }
                     }
                 )
-                OutlinedIconButton(
-                    modifier = Modifier.wrapContentSize(),
-                    onClick = {
-                        consumptions[index].markNeedAdd(queryType.str, true)
-                        onDismissRequest()
-                    }
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            modifier = Modifier
-                                .padding(start = 5.dp)
-                                .align(Alignment.Center),
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "add"
-                        )
+                if (canAdd) {
+                    OutlinedIconButton(
+                        modifier = Modifier.wrapContentSize(),
+                        shape = RectangleShape,
+                        onClick = {
+                            consumptions[index].markNeedAdd(queryType.str, true)
+                            onDismissRequest()
+                        }
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                modifier = Modifier
+                                    .padding(start = 5.dp)
+                                    .align(Alignment.Center),
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "add"
+                            )
+                        }
                     }
                 }
             }
             LazyColumn {
-                items(queryResult) { customer ->
+                items(queryResult) { node ->
                     Text(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 5.dp)
                             .clickable {
                                 consumptions[index].run {
-                                    this.customer = customer
-                                    markNeedAdd(queryType.str, false)
+                                    when (queryType) {
+                                        MoneyNodeType.Customer -> this.customer = node
+                                        MoneyNodeType.Card -> this.card = node
+                                        MoneyNodeType.Employee -> this.servant = node
+                                        else -> {}
+                                    }
+                                    if (canAdd) {
+                                        markNeedAdd(queryType.str, false)
+                                    }
                                 }
                                 onDismissRequest()
                             },
-                        text = customer.name + " " + customer.keys?.joinToString(),
+                        text = node.name + " " + node.keys?.joinToString(),
                         maxLines = 1
                     )
                 }
@@ -353,9 +533,6 @@ private fun QueryServiceDialog(
         )
     ) {
         Column {
-            consumptions[index].service?.let {
-                Text("选择：${it.name}")
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -411,7 +588,7 @@ private fun QueryServiceDialog(
                                 }
                                 onDismissRequest()
                             },
-                        text = service.name + " " + service.price.toPlainString() + " " + service.desc,
+                        text = service.name + " " + service.price.displayStr + " " + service.desc,
                         maxLines = 1
                     )
                 }

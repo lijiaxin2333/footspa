@@ -1,13 +1,16 @@
 package com.spread.footspa.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,7 +23,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.spread.footspa.ui.card.AddCardScreen
+import com.spread.footspa.ui.card.CardScreen
 import com.spread.footspa.ui.card.CardTypeManagementScreen
 import kotlinx.serialization.Serializable
 
@@ -32,7 +35,7 @@ sealed interface Route {
     data object CardType : Route
 
     @Serializable
-    data object AddCard : Route
+    data object Card : Route
 
     @Serializable
     data object Consume : Route
@@ -58,7 +61,8 @@ fun App() {
                 composable<Route.Main> {
                     MainScreen(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
+                            .wrapContentSize()
                             .padding(horizontal = 5.dp),
                         navController = navController
                     )
@@ -66,8 +70,8 @@ fun App() {
                 composable<Route.CardType> {
                     CardTypeManagementScreen()
                 }
-                composable<Route.AddCard> {
-                    AddCardScreen()
+                composable<Route.Card> {
+                    CardScreen(modifier = Modifier.fillMaxSize())
                 }
                 composable<Route.Consume> {
                     ConsumeScreen()
@@ -85,21 +89,36 @@ fun App() {
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier, navController: NavController) {
-    LazyVerticalGrid(modifier = modifier, columns = GridCells.Fixed(2)) {
-        item {
-            MainButton(navController, "办新卡", Route.AddCard)
+    Column(modifier = modifier) {
+        LazyVerticalGrid(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentSize(),
+            columns = GridCells.Fixed(2)
+        ) {
+            item {
+                MainButton(navController, "消费", Route.Consume)
+            }
         }
-        item {
-            MainButton(navController, "消费", Route.Consume)
-        }
-        item {
-            MainButton(navController, "卡类管理", Route.CardType)
-        }
-        item {
-            MainButton(navController, "项目管理", Route.MassageService)
-        }
-        item {
-            MainButton(navController, "人员管理", Route.People)
+        HorizontalDivider()
+        LazyVerticalGrid(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentSize(),
+            columns = GridCells.Fixed(2)
+        ) {
+            item {
+                MainButton(navController, "会员卡管理", Route.Card)
+            }
+            item {
+                MainButton(navController, "卡类管理", Route.CardType)
+            }
+            item {
+                MainButton(navController, "项目管理", Route.MassageService)
+            }
+            item {
+                MainButton(navController, "人员管理", Route.People)
+            }
         }
     }
 }
