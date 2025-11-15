@@ -1,6 +1,7 @@
 package com.spread.footspa.ui.common
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -25,6 +26,7 @@ fun StepColumn(
                         maxStepIndex++
                     }
                 }
+                HorizontalDivider()
             }
         }
     }

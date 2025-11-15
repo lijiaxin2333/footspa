@@ -95,8 +95,6 @@ private fun typeOf(str: String): ConsumptionType = when (str) {
 
 private class Consumption {
     var type by mutableStateOf(ConsumptionType.None)
-        private set
-
     var customer by mutableStateOf<MoneyNode?>(null)
     var card by mutableStateOf<MoneyNode?>(null)
     var money by mutableStateOf<BigDecimal?>(null)
@@ -114,16 +112,6 @@ private class Consumption {
         addMap[type.str] = value
     }
 
-    fun changeType(type: ConsumptionType) {
-        this.type = type
-        customer = null
-        card = null
-        money = null
-        service = null
-        servant = null
-        ready = false
-        addMap.clear()
-    }
 }
 
 
@@ -275,19 +263,25 @@ private fun OneConsumption(
     onDelete: () -> Unit
 ) {
     Column(modifier = modifier) {
-        Text(text = "消费类型")
-        SelectOneOptions(
-            modifier = Modifier,
-            options = listOf(
-                ConsumptionType.Purchase.str,
-                ConsumptionType.Deposit.str,
-                ConsumptionType.UseCard.str,
-                ConsumptionType.ThirdParty.str
-            ),
-            onOptionSelected = {
-                consumption.changeType(typeOf(it))
-            }
-        )
+        var typeSelected by remember { mutableStateOf(false) }
+        if (!typeSelected) {
+            Text(text = "消费类型")
+            SelectOneOptions(
+                modifier = Modifier,
+                options = listOf(
+                    ConsumptionType.Purchase.str,
+                    ConsumptionType.Deposit.str,
+                    ConsumptionType.UseCard.str,
+                    ConsumptionType.ThirdParty.str
+                ),
+                onOptionSelected = {
+                    consumption.type = typeOf(it)
+                    typeSelected = true
+                }
+            )
+        } else {
+            Text(text = "消费类型: ${consumption.type.str}")
+        }
         when (consumption.type) {
             ConsumptionType.Purchase -> {
                 var customerFinish by remember { mutableStateOf(false) }
@@ -653,7 +647,6 @@ private fun CardInfo(
                     }
                 }
                 item {
-                    Text(text = "联系电话:")
                     PhoneNumberInput(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -689,14 +682,15 @@ private fun CardInfo(
             val newCard = cards.find {
                 consumption.card == it
             } == null
+            var cardType by remember {
+                mutableStateOf<CardType?>(null)
+            }
             LaunchedEffect(consumption.card) {
                 consumption.card?.let {
-
+                    cardType = FSDB.findCardType(it)
                 }
             }
             consumption.card?.let { card ->
-                val types by FSDB.cardTypeFlow.collectAsState()
-                val cardType = types.find { it.id == card.cardTypeId }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("卡名: ${card.name}")
                     if (newCard) {
@@ -928,4 +922,8 @@ private fun QueryServiceDialog(
             }
         }
     }
+}
+
+private fun submitConsumptions(consumptions: List<Consumption>) {
+
 }

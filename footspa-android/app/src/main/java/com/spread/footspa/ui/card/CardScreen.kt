@@ -112,10 +112,15 @@ fun CardScreen(
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(cardList) { card ->
                     Column {
-                        val cardType = FSDB.findCardType(card)
+                        var cardType: CardType? by remember { mutableStateOf(null) }
+                        LaunchedEffect(card) {
+                            cardType = FSDB.findCardType(card)
+                        }
                         Row {
-                            if (cardType != null && cardType.legacy) {
-                                LegacyCardChip()
+                            cardType?.let {
+                                if (it.legacy) {
+                                    LegacyCardChip()
+                                }
                             }
                             if (card.cardValid != null && !card.cardValid) {
                                 InvalidCardChip()
@@ -123,10 +128,10 @@ fun CardScreen(
                         }
                         Text(text = "卡名: ${card.name}")
                         Text(text = "电话: ${card.keys?.joinToString()}")
-                        if (cardType != null) {
-                            Text(text = "起充价格: ${cardType.price.displayStr}")
-                            Text(text = "折扣: ${cardType.discount}")
-                            Text(text = "新老卡: ${if (cardType.legacy) "老卡" else "新卡"}")
+                        cardType?.let {
+                            Text(text = "起充价格: ${it.price.displayStr}")
+                            Text(text = "折扣: ${it.discount}")
+                            Text(text = "新老卡: ${if (it.legacy) "老卡" else "新卡"}")
                         }
                         HorizontalDivider()
                     }

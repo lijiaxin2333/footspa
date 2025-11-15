@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.spread.footspa.MainApplication
 import com.spread.footspa.asApplicationStateFlow
@@ -32,15 +33,21 @@ abstract class FSDB : RoomDatabase() {
             }
 
             override fun onOpen(db: SupportSQLiteDatabase) {
-                if (!db.isReadOnly) {
-                    runOnApplicationScope {
-                        dao.initDBIfNeeded()
+                db.beginTransaction()
+                try {
+                    if (!db.isReadOnly) {
+                        runOnApplicationScope {
+                            dao.initDBIfNeeded()
+                        }
                     }
+                    db.setTransactionSuccessful()
+                } finally {
+                    db.endTransaction()
                 }
             }
         }
 
-        private val db by lazy {
+        val db by lazy {
             Room.databaseBuilder(
                 context = MainApplication.instance,
                 klass = FSDB::class.java,
@@ -59,16 +66,32 @@ abstract class FSDB : RoomDatabase() {
 
         val cardTypeFlow = dao.listenToAllCardTypes().asApplicationStateFlow(emptyList())
 
+        suspend fun getAllMoneyNodes(): List<MoneyNode> {
+            return dao.getAllMoneyNodes()
+        }
+
+        suspend fun getAllMassageServices(): List<MassageService> {
+            return dao.getAllMassageServices()
+        }
+
+        suspend fun getAllBills(): List<Bill> {
+            return dao.getAllBills()
+        }
+
+        suspend fun getAllCardTypes(): List<CardType> {
+            return dao.getAllCardTypes()
+        }
+
         private val sqlist = listOf(
             SQLConst.UNIQUE_INDEX_TYPE_OUTSIDE,
             SQLConst.UNIQUE_INDEX_TYPE_PUBLIC
         )
 
-        fun findCardType(card: MoneyNode): CardType? {
+        suspend fun findCardType(card: MoneyNode): CardType? {
             if (card.cardTypeId == null) {
                 return null
             }
-            val type = cardTypeFlow.value.find { it.id == card.cardTypeId }
+            val type = getAllCardTypes().find { it.id == card.cardTypeId }
             return type
         }
 
@@ -140,30 +163,6 @@ abstract class FSDB : RoomDatabase() {
 
         suspend fun insertMassageService(vararg services: MassageService) =
             dao.insertMassageService(*services)
-
-        fun getCardByPhoneNumber(phoneNumber: String): List<MoneyNode> {
-            return moneyNodeFlow.value.filter {
-                it.type == MoneyNodeType.Card && it.containsKey(phoneNumber)
-            }
-        }
-
-        fun getCustomerByPhoneNumber(phoneNumber: String): List<MoneyNode> {
-            return moneyNodeFlow.value.filter {
-                it.type == MoneyNodeType.Customer && it.containsKey(phoneNumber)
-            }
-        }
-
-        fun getEmployerByPhoneNumber(phoneNumber: String): List<MoneyNode> {
-            return moneyNodeFlow.value.filter {
-                it.type == MoneyNodeType.Employer && it.containsKey(phoneNumber)
-            }
-        }
-
-        fun getEmployeeByPhoneNumber(phoneNumber: String): List<MoneyNode> {
-            return moneyNodeFlow.value.filter {
-                it.type == MoneyNodeType.Employee && it.containsKey(phoneNumber)
-            }
-        }
 
     }
 

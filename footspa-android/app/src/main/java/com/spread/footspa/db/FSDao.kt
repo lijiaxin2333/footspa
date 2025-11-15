@@ -3,10 +3,10 @@ package com.spread.footspa.db
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import com.spread.footspa.db.FSDB.Companion.billFlow
-import com.spread.footspa.db.FSDB.Companion.massageServiceFlow
-import com.spread.footspa.db.FSDB.Companion.moneyNodeFlow
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @Dao
 abstract class FSDao {
@@ -35,10 +35,22 @@ abstract class FSDao {
     @Query("SELECT * FROM ${SQLConst.TABLE_NAME_CARD_TYPE}")
     abstract fun listenToAllCardTypes(): Flow<List<CardType>>
 
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE}")
+    abstract suspend fun getAllMoneyNodes(): List<MoneyNode>
 
-    fun checkDBHealthy(): Boolean {
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MASSAGE_SERVICE}")
+    abstract suspend fun getAllMassageServices(): List<MassageService>
+
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_BILL}")
+    abstract suspend fun getAllBills(): List<Bill>
+
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_CARD_TYPE}")
+    abstract suspend fun getAllCardTypes(): List<CardType>
+
+
+    suspend fun checkDBHealthy(): Boolean {
         // only 1 public
-        val moneyNodes = moneyNodeFlow.value
+        val moneyNodes = FSDB.getAllMoneyNodes()
         if (!moneyNodes.ensureOneExists(MoneyNodeType.Public)) {
             return false
         }
@@ -49,19 +61,24 @@ abstract class FSDao {
         return true
     }
 
+    private val initMutex = Mutex()
+
     suspend fun initDBIfNeeded() {
-        if (moneyNodeFlow.value.isEmpty() && massageServiceFlow.value.isEmpty() && billFlow.value.isEmpty()) {
-            val publicNode = buildMoneyNode {
-                name = "public"
-                type = MoneyNodeType.Public
+        initMutex.withLock {
+            val moneyNodes = FSDB.getAllMoneyNodes()
+            if (moneyNodes.isEmpty()) {
+                val publicNode = buildMoneyNode {
+                    name = "public"
+                    type = MoneyNodeType.Public
+                }
+                val outsideNode = buildMoneyNode {
+                    name = "outside"
+                    type = MoneyNodeType.Outside
+                }
+                insertMoneyNode(publicNode, outsideNode)
+            } else if (!checkDBHealthy()) {
+                throw IllegalStateException("db is unhealthy on init!")
             }
-            val outsideNode = buildMoneyNode {
-                name = "outside"
-                type = MoneyNodeType.Outside
-            }
-            insertMoneyNode(publicNode, outsideNode)
-        } else if (!checkDBHealthy()) {
-            throw IllegalStateException("db is unhealthy on init!")
         }
     }
 
