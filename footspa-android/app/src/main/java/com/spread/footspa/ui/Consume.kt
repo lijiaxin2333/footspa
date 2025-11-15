@@ -25,12 +25,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +61,7 @@ import com.spread.footspa.db.queryCard
 import com.spread.footspa.db.queryMassageService
 import com.spread.footspa.db.queryMoneyNode
 import com.spread.footspa.ui.card.ChooseCardType
+import com.spread.footspa.ui.common.EasyTextField
 import com.spread.footspa.ui.common.InvalidCardChip
 import com.spread.footspa.ui.common.LegacyCardChip
 import com.spread.footspa.ui.common.MoneyExpr
@@ -92,22 +93,16 @@ private fun typeOf(str: String): ConsumptionType = when (str) {
     else -> ConsumptionType.None
 }
 
-private class Consumption(
-    type: ConsumptionType = ConsumptionType.None,
-    customer: MoneyNode? = null,
-    card: MoneyNode? = null,
-    money: BigDecimal? = null,
-    service: MassageService? = null,
-    servant: MoneyNode? = null
-) {
-    var type by mutableStateOf(type)
+private class Consumption {
+    var type by mutableStateOf(ConsumptionType.None)
         private set
 
-    var customer by mutableStateOf(customer)
-    var card by mutableStateOf(card)
-    var money by mutableStateOf(money)
-    var service by mutableStateOf(service)
-    var servant by mutableStateOf(servant)
+    var customer by mutableStateOf<MoneyNode?>(null)
+    var card by mutableStateOf<MoneyNode?>(null)
+    var money by mutableStateOf<BigDecimal?>(null)
+    var service by mutableStateOf<MassageService?>(null)
+    var servant by mutableStateOf<MoneyNode?>(null)
+    var remark by mutableStateOf<String?>(null)
     val addMap = mutableStateMapOf<String, Boolean>()
     var showMoneyInput by mutableStateOf(false)
 
@@ -142,12 +137,16 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
     var thirdDialogIndex by remember { mutableIntStateOf(-1) }
     LazyColumn(modifier = modifier) {
         itemsIndexed(consumptions) { index, consumption ->
-            Row(modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)) {
-                Box(modifier = Modifier
-                    .width(20.dp)
-                    .fillMaxHeight()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(20.dp)
+                        .fillMaxHeight()
+                ) {
                     Text(modifier = Modifier.align(Alignment.Center), text = "${index + 1}")
                 }
                 VerticalDivider()
@@ -295,6 +294,7 @@ private fun OneConsumption(
                 var serviceFinish by remember { mutableStateOf(false) }
                 var servantFinish by remember { mutableStateOf(false) }
                 var moneyFinish by remember { mutableStateOf(false) }
+                var remarkFinish by remember { mutableStateOf(false) }
                 StepColumn(
                     stepsBuilder = {
                         add { finish ->
@@ -337,6 +337,16 @@ private fun OneConsumption(
                                 finish = {
                                     finish()
                                     moneyFinish = true
+                                }
+                            )
+                        }
+                        add { finish ->
+                            RemarkInfo(
+                                consumption = consumption,
+                                isFinished = remarkFinish,
+                                finish = {
+                                    finish()
+                                    remarkFinish = true
                                     consumption.ready = true
                                 }
                             )
@@ -349,6 +359,7 @@ private fun OneConsumption(
                 var customerFinish by remember { mutableStateOf(false) }
                 var cardFinish by remember { mutableStateOf(false) }
                 var moneyFinish by remember { mutableStateOf(false) }
+                var remarkFinish by remember { mutableStateOf(false) }
                 StepColumn(
                     stepsBuilder = {
                         add { finish ->
@@ -380,6 +391,16 @@ private fun OneConsumption(
                                 finish = {
                                     finish()
                                     moneyFinish = true
+                                }
+                            )
+                        }
+                        add { finish ->
+                            RemarkInfo(
+                                consumption = consumption,
+                                isFinished = remarkFinish,
+                                finish = {
+                                    finish()
+                                    remarkFinish = true
                                     consumption.ready = true
                                 }
                             )
@@ -697,6 +718,37 @@ private fun CardInfo(
                 }
                 finish()
             }
+        }
+    }
+}
+
+@Composable
+private fun RemarkInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    isFinished: Boolean,
+    finish: () -> Unit
+) {
+    var remarkInput by remember { mutableStateOf("") }
+    Row(modifier = modifier) {
+        if (!isFinished) {
+            EasyTextField(
+                modifier = Modifier.weight(1f),
+                value = remarkInput,
+                onValueChange = {
+                    remarkInput = it
+                }
+            )
+            TextButton(
+                onClick = {
+                    consumption.remark = remarkInput
+                    finish()
+                }
+            ) {
+                Text(text = "确定备注")
+            }
+        } else {
+            Text(text = "备注: ${consumption.remark}")
         }
     }
 }

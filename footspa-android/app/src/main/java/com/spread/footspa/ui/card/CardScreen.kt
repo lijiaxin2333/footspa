@@ -52,7 +52,10 @@ fun CardScreen(
         if (page == 0) {
             var selectedCardInfo: CardType? by remember { mutableStateOf(null) }
             val phoneNumbers = remember { mutableStateListOf("") }
-            LazyColumn(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 item {
                     ChooseCardType(
                         modifier = Modifier
