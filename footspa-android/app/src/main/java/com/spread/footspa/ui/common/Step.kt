@@ -11,18 +11,23 @@ typealias StepContent = @Composable (onFinished: () -> Unit) -> Unit
 
 @Composable
 fun StepColumn(
-    stepsBuilder: MutableList<StepContent>.() -> Unit
+    stepsBuilder: MutableList<StepContent>.() -> Unit,
+    onAllStepsFinished: () -> Unit
 ) {
     val steps = buildList(stepsBuilder)
-    var currentIndex by remember { mutableStateOf(0) }
+    var maxStepIndex by remember { mutableStateOf(0) }
 
     Column {
         steps.forEachIndexed { index, step ->
-            if (index <= currentIndex) {
+            if (index <= maxStepIndex) {
                 step {
-                    // 当 step 完成后，展示下一个
-                    if (currentIndex == index && currentIndex < steps.lastIndex) {
-                        currentIndex++
+                    if (maxStepIndex == steps.lastIndex) {
+                        // last step finish
+                        onAllStepsFinished()
+                    }
+                    if (maxStepIndex == index && maxStepIndex < steps.lastIndex) {
+                        // next step
+                        maxStepIndex++
                     }
                 }
             }

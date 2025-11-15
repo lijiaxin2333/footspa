@@ -76,22 +76,38 @@ private class Consumption(
     type: ConsumptionType = ConsumptionType.None,
     customer: MoneyNode? = null,
     card: MoneyNode? = null,
-    money: BigDecimal = BigDecimal.ZERO,
+    money: BigDecimal? = null,
     service: MassageService? = null,
     servant: MoneyNode? = null
 ) {
     var type by mutableStateOf(type)
+        private set
+
     var customer by mutableStateOf(customer)
     var card by mutableStateOf(card)
     var money by mutableStateOf(money)
     var service by mutableStateOf(service)
     var servant by mutableStateOf(servant)
     val addMap = mutableStateMapOf<String, Boolean>()
+    var showMoneyInput by mutableStateOf(false)
+
+    var ready by mutableStateOf(false)
 
     fun needAdd(key: String) = addMap[key] ?: false
 
     fun markNeedAdd(key: String, value: Boolean) {
         addMap[key] = value
+    }
+
+    fun changeType(type: ConsumptionType) {
+        this.type = type
+        customer = null
+        card = null
+        money = null
+        service = null
+        servant = null
+        ready = false
+        addMap.clear()
     }
 }
 
@@ -214,34 +230,75 @@ private fun OneConsumption(
                 ConsumptionType.ThirdParty.str
             ),
             onOptionSelected = {
-                consumption.type = typeOf(it)
+                consumption.changeType(typeOf(it))
             }
         )
         when (consumption.type) {
             ConsumptionType.Purchase -> {
-                StepColumn {
-                    add { finish ->
-                        CustomerInfo(
-                            consumption = consumption,
-                            onClickCustomer = onClickCustomer,
-                            finish = finish
-                        )
+                var customerFinish by mutableStateOf(false)
+                var serviceFinish by mutableStateOf(false)
+                var servantFinish by mutableStateOf(false)
+                var moneyFinish by mutableStateOf(false)
+                StepColumn(
+                    stepsBuilder = {
+                        add { finish ->
+                            CustomerInfo(
+                                consumption = consumption,
+                                onClickCustomer = onClickCustomer,
+                                isFinished = customerFinish,
+                                finish = {
+                                    finish()
+                                    customerFinish = true
+                                }
+                            )
+                        }
+                        add { finish ->
+                            ServiceInfo(
+                                consumption = consumption,
+                                onClickService = onClickService,
+                                isFinished = serviceFinish,
+                                finish = {
+                                    finish()
+                                    serviceFinish = true
+                                }
+                            )
+                        }
+                        add { finish ->
+                            ServantInfo(
+                                consumption = consumption,
+                                onClickServant = onClickServant,
+                                isFinished = servantFinish,
+                                finish = {
+                                    finish()
+                                    servantFinish = true
+                                }
+                            )
+                        }
+                        add { finish ->
+                            MoneyInfo(
+                                consumption = consumption,
+                                isFinished = moneyFinish,
+                                finish = {
+                                    finish()
+                                    moneyFinish = true
+                                }
+                            )
+                        }
+                    },
+                    onAllStepsFinished = {
+
                     }
-                    add { finish ->
-                        ServiceInfo(
-                            consumption = consumption,
-                            onClickService = onClickService,
-                            finish = finish
-                        )
+                )
+            }
+
+            ConsumptionType.Deposit -> {
+                StepColumn(
+                    stepsBuilder = {
+                    },
+                    onAllStepsFinished = {
+
                     }
-                    add { finish ->
-                        ServantInfo(
-                            consumption = consumption,
-                            onClickServant = onClickServant,
-                            finish = finish
-                        )
-                    }
-                }
+                )
             }
 
             else -> {}
@@ -254,14 +311,19 @@ private fun CustomerInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
     onClickCustomer: () -> Unit,
+    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onClickCustomer
-        ) {
-            Text(text = "确定顾客信息")
+        if (!isFinished) {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    onClickCustomer()
+                }
+            ) {
+                Text(text = "确定顾客信息")
+            }
         }
         if (consumption.needAdd(MoneyNodeType.Customer.str)) {
             var nameInput by remember { mutableStateOf("") }
@@ -318,14 +380,19 @@ private fun ServantInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
     onClickServant: () -> Unit,
+    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onClickServant,
-        ) {
-            Text(text = "确定服务员工信息")
+        if (!isFinished) {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    onClickServant()
+                },
+            ) {
+                Text(text = "确定服务员工信息")
+            }
         }
         consumption.servant?.let {
             Text("员工姓名: ${it.name}")
@@ -340,14 +407,19 @@ private fun ServiceInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
     onClickService: () -> Unit,
+    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onClickService
-        ) {
-            Text(text = "确定服务信息")
+        if (!isFinished) {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    onClickService()
+                }
+            ) {
+                Text(text = "确定服务信息")
+            }
         }
         if (consumption.needAdd(MassageService::class.java.name)) {
             var serviceNameInputText by remember { mutableStateOf("") }
@@ -412,6 +484,63 @@ private fun ServiceInfo(
                 it.desc?.takeIf { d -> d.isNotBlank() }?.let { desc ->
                     Text(desc)
                 }
+                finish()
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoneyInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    isFinished: Boolean,
+    finish: () -> Unit
+) {
+    Column(modifier = modifier) {
+        if (!isFinished) {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    consumption.showMoneyInput = true
+                }
+            ) {
+                Text(text = "确认金额")
+            }
+        }
+        if (consumption.showMoneyInput) {
+            val moneyInputState = remember { MoneyInputState() }
+            var expression by remember { mutableStateOf("") }
+            var value: BigDecimal? by remember { mutableStateOf(BigDecimal.ZERO) }
+            var err: String? by remember { mutableStateOf(null) }
+            LaunchedEffect(Unit) {
+                moneyInputState.expressionDataFlow.collect {
+                    expression = it.expr
+                    value = it.value
+                    err = it.err
+                }
+            }
+            MoneyExpr(
+                label = "价格",
+                expression = expression,
+                initial = null,
+                value = value,
+                err = err
+            )
+            MoneyInput2(inputState = moneyInputState)
+            value?.let {
+                Button(
+                    onClick = {
+                        consumption.money = it
+                        consumption.showMoneyInput = false
+                    }
+                ) {
+                    Text("确认金额: ${it.displayStr}")
+                }
+            }
+        } else {
+            consumption.money?.let { money ->
+                Text("金额: ${money.displayStr}")
                 finish()
             }
         }
