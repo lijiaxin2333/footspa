@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +22,7 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -50,6 +52,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.room.withTransaction
 import com.spread.footspa.common.displayStr
 import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
@@ -188,9 +191,14 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                         }
                     }
                     if (consumptions.all { it.ready }) {
+                        val scope = rememberCoroutineScope()
                         OutlinedButton(
                             onClick = {
-
+                                scope.launch(Dispatchers.IO) {
+                                    FSDB.db.withTransaction {
+                                        submitConsumptions(consumptions)
+                                    }
+                                }
                             }
                         ) {
                             Text(text = "提交所有消费")
@@ -280,7 +288,7 @@ private fun OneConsumption(
                 }
             )
         } else {
-            Text(text = "消费类型: ${consumption.type.str}")
+            Text(text = "消费类型: ${consumption.type.str}", color = Color.Red)
         }
         when (consumption.type) {
             ConsumptionType.Purchase -> {
@@ -289,64 +297,62 @@ private fun OneConsumption(
                 var servantFinish by remember { mutableStateOf(false) }
                 var moneyFinish by remember { mutableStateOf(false) }
                 var remarkFinish by remember { mutableStateOf(false) }
-                StepColumn(
-                    stepsBuilder = {
-                        add { finish ->
-                            CustomerInfo(
-                                consumption = consumption,
-                                onClickCustomer = onClickCustomer,
-                                isFinished = customerFinish,
-                                finish = {
-                                    finish()
-                                    customerFinish = true
-                                }
-                            )
-                        }
-                        add { finish ->
-                            ServiceInfo(
-                                consumption = consumption,
-                                onClickService = onClickService,
-                                isFinished = serviceFinish,
-                                finish = {
-                                    finish()
-                                    serviceFinish = true
-                                }
-                            )
-                        }
-                        add { finish ->
-                            ServantInfo(
-                                consumption = consumption,
-                                onClickServant = onClickServant,
-                                isFinished = servantFinish,
-                                finish = {
-                                    finish()
-                                    servantFinish = true
-                                }
-                            )
-                        }
-                        add { finish ->
-                            MoneyInfo(
-                                consumption = consumption,
-                                isFinished = moneyFinish,
-                                finish = {
-                                    finish()
-                                    moneyFinish = true
-                                }
-                            )
-                        }
-                        add { finish ->
-                            RemarkInfo(
-                                consumption = consumption,
-                                isFinished = remarkFinish,
-                                finish = {
-                                    finish()
-                                    remarkFinish = true
-                                    consumption.ready = true
-                                }
-                            )
-                        }
+                StepColumn {
+                    add { finish ->
+                        CustomerInfo(
+                            consumption = consumption,
+                            onClickCustomer = onClickCustomer,
+                            isFinished = customerFinish,
+                            finish = {
+                                finish()
+                                customerFinish = true
+                            }
+                        )
                     }
-                )
+                    add { finish ->
+                        ServiceInfo(
+                            consumption = consumption,
+                            onClickService = onClickService,
+                            isFinished = serviceFinish,
+                            finish = {
+                                finish()
+                                serviceFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        ServantInfo(
+                            consumption = consumption,
+                            onClickServant = onClickServant,
+                            isFinished = servantFinish,
+                            finish = {
+                                finish()
+                                servantFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        MoneyInfo(
+                            consumption = consumption,
+                            isFinished = moneyFinish,
+                            finish = {
+                                finish()
+                                moneyFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        RemarkInfo(
+                            consumption = consumption,
+                            isFinished = remarkFinish,
+                            finish = {
+                                finish()
+                                remarkFinish = true
+                                consumption.ready = true
+                            }
+                        )
+                    }
+                }
             }
 
             ConsumptionType.Deposit -> {
@@ -354,68 +360,156 @@ private fun OneConsumption(
                 var cardFinish by remember { mutableStateOf(false) }
                 var moneyFinish by remember { mutableStateOf(false) }
                 var remarkFinish by remember { mutableStateOf(false) }
-                StepColumn(
-                    stepsBuilder = {
-                        add { finish ->
-                            CustomerInfo(
-                                consumption = consumption,
-                                onClickCustomer = onClickCustomer,
-                                isFinished = customerFinish,
-                                finish = {
-                                    finish()
-                                    customerFinish = true
-                                }
-                            )
-                        }
-                        add { finish ->
-                            CardInfo(
-                                consumption = consumption,
-                                onClickCard = onClickCard,
-                                isFinished = cardFinish,
-                                finish = {
-                                    finish()
-                                    cardFinish = true
-                                }
-                            )
-                        }
-                        add { finish ->
-                            MoneyInfo(
-                                consumption = consumption,
-                                isFinished = moneyFinish,
-                                finish = {
-                                    finish()
-                                    moneyFinish = true
-                                }
-                            )
-                        }
-                        add { finish ->
-                            RemarkInfo(
-                                consumption = consumption,
-                                isFinished = remarkFinish,
-                                finish = {
-                                    finish()
-                                    remarkFinish = true
-                                    consumption.ready = true
-                                }
-                            )
-                        }
+                StepColumn {
+                    add { finish ->
+                        CustomerInfo(
+                            consumption = consumption,
+                            onClickCustomer = onClickCustomer,
+                            isFinished = customerFinish,
+                            finish = {
+                                finish()
+                                customerFinish = true
+                            }
+                        )
                     }
-                )
+                    add { finish ->
+                        CardInfo(
+                            consumption = consumption,
+                            onClickCard = onClickCard,
+                            isFinished = cardFinish,
+                            finish = {
+                                finish()
+                                cardFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        MoneyInfo(
+                            consumption = consumption,
+                            isFinished = moneyFinish,
+                            finish = {
+                                finish()
+                                moneyFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        RemarkInfo(
+                            consumption = consumption,
+                            isFinished = remarkFinish,
+                            finish = {
+                                finish()
+                                remarkFinish = true
+                                consumption.ready = true
+                            }
+                        )
+                    }
+                }
+            }
+
+            ConsumptionType.UseCard -> {
+                var customerFinish by remember { mutableStateOf(false) }
+                var serviceFinish by remember { mutableStateOf(false) }
+                var servantFinish by remember { mutableStateOf(false) }
+                var cardFinish by remember { mutableStateOf(false) }
+                var moneyFinish by remember { mutableStateOf(false) }
+                var remarkFinish by remember { mutableStateOf(false) }
+                StepColumn {
+                    add { finish ->
+                        CustomerInfo(
+                            consumption = consumption,
+                            onClickCustomer = onClickCustomer,
+                            isFinished = customerFinish,
+                            finish = {
+                                finish()
+                                customerFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        ServiceInfo(
+                            consumption = consumption,
+                            onClickService = onClickService,
+                            isFinished = serviceFinish,
+                            finish = {
+                                finish()
+                                serviceFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        ServantInfo(
+                            consumption = consumption,
+                            onClickServant = onClickServant,
+                            isFinished = servantFinish,
+                            finish = {
+                                finish()
+                                servantFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        CardInfo(
+                            consumption = consumption,
+                            onClickCard = onClickCard,
+                            isFinished = cardFinish,
+                            finish = {
+                                finish()
+                                cardFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        MoneyInfo(
+                            consumption = consumption,
+                            isFinished = moneyFinish,
+                            finish = {
+                                finish()
+                                moneyFinish = true
+                            }
+                        )
+                    }
+                    add { finish ->
+                        RemarkInfo(
+                            consumption = consumption,
+                            isFinished = remarkFinish,
+                            finish = {
+                                finish()
+                                remarkFinish = true
+                                consumption.ready = true
+                            }
+                        )
+                    }
+                }
             }
 
             else -> {}
         }
-        FilledIconButton(
-            modifier = Modifier.align(Alignment.End),
-            onClick = onDelete,
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = Color.Red
-            )
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Delete,
-                contentDescription = "删除"
-            )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            if (consumption.ready) {
+                FilledIconButton(
+                    enabled = false,
+                    onClick = {}
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Done,
+                        contentDescription = "完成"
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            FilledIconButton(
+                onClick = onDelete,
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = Color.Red
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "删除"
+                )
+            }
         }
     }
 }
