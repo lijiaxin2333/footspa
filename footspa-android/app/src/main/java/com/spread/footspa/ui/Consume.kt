@@ -56,13 +56,14 @@ import androidx.room.withTransaction
 import com.spread.footspa.common.displayStr
 import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
+import com.spread.footspa.db.FSDB.Companion.queryCard
+import com.spread.footspa.db.FSDB.Companion.queryMassageService
+import com.spread.footspa.db.FSDB.Companion.queryMoneyNode
 import com.spread.footspa.db.MassageService
 import com.spread.footspa.db.MoneyNode
 import com.spread.footspa.db.MoneyNodeType
+import com.spread.footspa.db.buildBill
 import com.spread.footspa.db.buildMoneyNode
-import com.spread.footspa.db.queryCard
-import com.spread.footspa.db.queryMassageService
-import com.spread.footspa.db.queryMoneyNode
 import com.spread.footspa.ui.card.ChooseCardType
 import com.spread.footspa.ui.common.EasyTextField
 import com.spread.footspa.ui.common.InvalidCardChip
@@ -77,10 +78,12 @@ import com.spread.footspa.ui.common.SelectOneOptions
 import com.spread.footspa.ui.common.StepColumn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 
-private enum class ConsumptionType(val str: String) {
+enum class ConsumptionType(val str: String) {
     None(""),
     Purchase("直接购买"),
     Deposit("储值"),
@@ -96,17 +99,29 @@ private fun typeOf(str: String): ConsumptionType = when (str) {
     else -> ConsumptionType.None
 }
 
-private class Consumption {
+class Consumption {
     var type by mutableStateOf(ConsumptionType.None)
+    var typeSelected by mutableStateOf(false)
     var customer by mutableStateOf<MoneyNode?>(null)
     var card by mutableStateOf<MoneyNode?>(null)
     var money by mutableStateOf<BigDecimal?>(null)
+    var moneyThird by mutableStateOf<BigDecimal?>(null)
     var service by mutableStateOf<MassageService?>(null)
     var servant by mutableStateOf<MoneyNode?>(null)
     var third by mutableStateOf<MoneyNode?>(null)
     var remark by mutableStateOf<String?>(null)
     val addMap = mutableStateMapOf<String, Boolean>()
     var showMoneyInput by mutableStateOf(false)
+    var showThirdMoneyInput by mutableStateOf(false)
+
+    var customerFinish by mutableStateOf(false)
+    var cardFinish by mutableStateOf(false)
+    var serviceFinish by mutableStateOf(false)
+    var servantFinish by mutableStateOf(false)
+    var thirdPartyFinish by mutableStateOf(false)
+    var moneyThirdFinish by mutableStateOf(false)
+    var moneyFinish by mutableStateOf(false)
+    var remarkFinish by mutableStateOf(false)
 
     var ready by mutableStateOf(false)
 
@@ -122,6 +137,7 @@ private class Consumption {
 @Composable
 fun ConsumeScreen(modifier: Modifier = Modifier) {
     val consumptions = remember { mutableStateListOf(Consumption()) }
+    val cache = remember { ConsumeCache() }
     var customerDialogIndex by remember { mutableIntStateOf(-1) }
     var cardDialogIndex by remember { mutableIntStateOf(-1) }
     var serviceDialogIndex by remember { mutableIntStateOf(-1) }
@@ -147,6 +163,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                         .weight(1f)
                         .wrapContentHeight(),
                     consumption = consumption,
+                    cache = cache,
                     onClickCustomer = {
                         customerDialogIndex = index
                     },
@@ -200,7 +217,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                             onClick = {
                                 scope.launch(Dispatchers.IO) {
                                     FSDB.db.withTransaction {
-                                        submitConsumptions(consumptions)
+                                        submitConsumptions(consumptions, cache)
                                     }
                                 }
                             }
@@ -224,6 +241,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                 customerDialogIndex = -1
             },
             consumptions = consumptions,
+            cache = cache,
             index = customerDialogIndex,
             queryType = MoneyNodeType.Customer,
             queryState = customerQueryState
@@ -235,6 +253,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                 cardDialogIndex = -1
             },
             consumptions = consumptions,
+            cache = cache,
             index = cardDialogIndex,
             queryType = MoneyNodeType.Card,
             queryState = cardQueryState
@@ -256,6 +275,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                 servantDialogIndex = -1
             },
             consumptions = consumptions,
+            cache = cache,
             index = servantDialogIndex,
             queryType = MoneyNodeType.Employee,
             queryState = servantQueryState,
@@ -268,6 +288,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                 thirdDialogIndex = -1
             },
             consumptions = consumptions,
+            cache = cache,
             index = thirdDialogIndex,
             queryType = MoneyNodeType.Third,
             queryState = thirdQueryState
@@ -279,6 +300,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
 private fun OneConsumption(
     modifier: Modifier = Modifier,
     consumption: Consumption,
+    cache: ConsumeCache,
     onClickCustomer: () -> Unit,
     onClickService: () -> Unit,
     onClickServant: () -> Unit,
@@ -287,8 +309,7 @@ private fun OneConsumption(
     onDelete: () -> Unit
 ) {
     Column(modifier = modifier) {
-        var typeSelected by remember { mutableStateOf(false) }
-        if (!typeSelected) {
+        if (!consumption.typeSelected) {
             Text(text = "消费类型")
             SelectOneOptions(
                 modifier = Modifier,
@@ -300,7 +321,7 @@ private fun OneConsumption(
                 ),
                 onOptionSelected = {
                     consumption.type = typeOf(it)
-                    typeSelected = true
+                    consumption.typeSelected = true
                 }
             )
         } else {
@@ -308,62 +329,40 @@ private fun OneConsumption(
         }
         when (consumption.type) {
             ConsumptionType.Purchase -> {
-                var customerFinish by remember { mutableStateOf(false) }
-                var serviceFinish by remember { mutableStateOf(false) }
-                var servantFinish by remember { mutableStateOf(false) }
-                var moneyFinish by remember { mutableStateOf(false) }
-                var remarkFinish by remember { mutableStateOf(false) }
                 StepColumn {
                     add { finish ->
                         CustomerInfo(
                             consumption = consumption,
+                            cache = cache,
                             onClickCustomer = onClickCustomer,
-                            isFinished = customerFinish,
-                            finish = {
-                                finish()
-                                customerFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         ServiceInfo(
                             consumption = consumption,
                             onClickService = onClickService,
-                            isFinished = serviceFinish,
-                            finish = {
-                                finish()
-                                serviceFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         ServantInfo(
                             consumption = consumption,
                             onClickServant = onClickServant,
-                            isFinished = servantFinish,
-                            finish = {
-                                finish()
-                                servantFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         MoneyInfo(
                             consumption = consumption,
-                            isFinished = moneyFinish,
-                            finish = {
-                                finish()
-                                moneyFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         RemarkInfo(
                             consumption = consumption,
-                            isFinished = remarkFinish,
                             finish = {
                                 finish()
-                                remarkFinish = true
                                 consumption.ready = true
                             }
                         )
@@ -372,50 +371,34 @@ private fun OneConsumption(
             }
 
             ConsumptionType.Deposit -> {
-                var customerFinish by remember { mutableStateOf(false) }
-                var cardFinish by remember { mutableStateOf(false) }
-                var moneyFinish by remember { mutableStateOf(false) }
-                var remarkFinish by remember { mutableStateOf(false) }
                 StepColumn {
                     add { finish ->
                         CustomerInfo(
                             consumption = consumption,
+                            cache = cache,
                             onClickCustomer = onClickCustomer,
-                            isFinished = customerFinish,
-                            finish = {
-                                finish()
-                                customerFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         CardInfo(
                             consumption = consumption,
+                            cache = cache,
                             onClickCard = onClickCard,
-                            isFinished = cardFinish,
-                            finish = {
-                                finish()
-                                cardFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         MoneyInfo(
                             consumption = consumption,
-                            isFinished = moneyFinish,
-                            finish = {
-                                finish()
-                                moneyFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         RemarkInfo(
                             consumption = consumption,
-                            isFinished = remarkFinish,
                             finish = {
                                 finish()
-                                remarkFinish = true
                                 consumption.ready = true
                             }
                         )
@@ -424,74 +407,48 @@ private fun OneConsumption(
             }
 
             ConsumptionType.UseCard -> {
-                var customerFinish by remember { mutableStateOf(false) }
-                var serviceFinish by remember { mutableStateOf(false) }
-                var servantFinish by remember { mutableStateOf(false) }
-                var cardFinish by remember { mutableStateOf(false) }
-                var moneyFinish by remember { mutableStateOf(false) }
-                var remarkFinish by remember { mutableStateOf(false) }
                 StepColumn {
                     add { finish ->
                         CustomerInfo(
                             consumption = consumption,
+                            cache = cache,
                             onClickCustomer = onClickCustomer,
-                            isFinished = customerFinish,
-                            finish = {
-                                finish()
-                                customerFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         ServiceInfo(
                             consumption = consumption,
                             onClickService = onClickService,
-                            isFinished = serviceFinish,
-                            finish = {
-                                finish()
-                                serviceFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         ServantInfo(
                             consumption = consumption,
                             onClickServant = onClickServant,
-                            isFinished = servantFinish,
-                            finish = {
-                                finish()
-                                servantFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         CardInfo(
                             consumption = consumption,
+                            cache = cache,
                             onClickCard = onClickCard,
-                            isFinished = cardFinish,
-                            finish = {
-                                finish()
-                                cardFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         MoneyInfo(
                             consumption = consumption,
-                            isFinished = moneyFinish,
-                            finish = {
-                                finish()
-                                moneyFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         RemarkInfo(
                             consumption = consumption,
-                            isFinished = remarkFinish,
                             finish = {
                                 finish()
-                                remarkFinish = true
                                 consumption.ready = true
                             }
                         )
@@ -500,74 +457,54 @@ private fun OneConsumption(
             }
 
             ConsumptionType.ThirdParty -> {
-                var customerFinish by remember { mutableStateOf(false) }
-                var serviceFinish by remember { mutableStateOf(false) }
-                var servantFinish by remember { mutableStateOf(false) }
-                var thirdPartyFinish by remember { mutableStateOf(false) }
-                var moneyFinish by remember { mutableStateOf(false) }
-                var remarkFinish by remember { mutableStateOf(false) }
                 StepColumn {
                     add { finish ->
                         CustomerInfo(
                             consumption = consumption,
+                            cache = cache,
                             onClickCustomer = onClickCustomer,
-                            isFinished = customerFinish,
-                            finish = {
-                                finish()
-                                customerFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         ServiceInfo(
                             consumption = consumption,
                             onClickService = onClickService,
-                            isFinished = serviceFinish,
-                            finish = {
-                                finish()
-                                serviceFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         ServantInfo(
                             consumption = consumption,
                             onClickServant = onClickServant,
-                            isFinished = servantFinish,
-                            finish = {
-                                finish()
-                                servantFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         ThirdPartyInfo(
                             consumption = consumption,
+                            cache = cache,
                             onClickThirdParty = onClickThirdParty,
-                            isFinished = thirdPartyFinish,
-                            finish = {
-                                finish()
-                                thirdPartyFinish = true
-                            }
+                            finish = finish
+                        )
+                    }
+                    add { finish ->
+                        MoneyThirdInfo(
+                            consumption = consumption,
+                            finish = finish
                         )
                     }
                     add { finish ->
                         MoneyInfo(
                             consumption = consumption,
-                            isFinished = moneyFinish,
-                            finish = {
-                                finish()
-                                moneyFinish = true
-                            }
+                            finish = finish
                         )
                     }
                     add { finish ->
                         RemarkInfo(
                             consumption = consumption,
-                            isFinished = remarkFinish,
                             finish = {
                                 finish()
-                                remarkFinish = true
                                 consumption.ready = true
                             }
                         )
@@ -610,12 +547,12 @@ private fun OneConsumption(
 private fun CustomerInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
+    cache: ConsumeCache,
     onClickCustomer: () -> Unit,
-    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        if (!isFinished) {
+        if (!consumption.customerFinish && !consumption.needAdd(MoneyNodeType.Customer)) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -626,6 +563,7 @@ private fun CustomerInfo(
             }
         }
         if (consumption.needAdd(MoneyNodeType.Customer)) {
+            val scope = rememberCoroutineScope()
             var nameInput by remember { mutableStateOf("") }
             val phoneNumbers = remember { mutableStateListOf("") }
             OutlinedTextField(
@@ -659,6 +597,10 @@ private fun CustomerInfo(
                     name = n
                     type = MoneyNodeType.Customer
                     keys = pn
+                }.also {
+                    scope.launch(Dispatchers.IO) {
+                        cache.commit(consumption to it)
+                    }
                 }
                 consumption.markNeedAdd(MoneyNodeType.Customer, false)
             }) { Text(text = "确定添加") }
@@ -675,6 +617,7 @@ private fun CustomerInfo(
                     }
                 }
                 Text("顾客电话: ${it.keys?.joinToString()}")
+                consumption.customerFinish = true
                 finish()
             }
         }
@@ -686,11 +629,10 @@ private fun ServantInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
     onClickServant: () -> Unit,
-    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        if (!isFinished) {
+        if (!consumption.servantFinish) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -703,6 +645,7 @@ private fun ServantInfo(
         consumption.servant?.let {
             Text("员工姓名: ${it.name}")
             Text("员工电话: ${it.keys?.joinToString()}")
+            consumption.servantFinish = true
             finish()
         }
     }
@@ -712,12 +655,12 @@ private fun ServantInfo(
 private fun ThirdPartyInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
+    cache: ConsumeCache,
     onClickThirdParty: () -> Unit,
-    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        if (!isFinished) {
+        if (!consumption.thirdPartyFinish && !consumption.needAdd(MoneyNodeType.Third)) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -728,6 +671,7 @@ private fun ThirdPartyInfo(
             }
         }
         if (consumption.needAdd(MoneyNodeType.Third)) {
+            val scope = rememberCoroutineScope()
             var nameInput by remember { mutableStateOf("") }
             Row(modifier = modifier) {
                 EasyTextField(
@@ -742,6 +686,10 @@ private fun ThirdPartyInfo(
                         consumption.third = buildMoneyNode {
                             this.name = nameInput
                             this.type = MoneyNodeType.Third
+                        }.also {
+                            scope.launch(Dispatchers.IO) {
+                                cache.commit(consumption to it)
+                            }
                         }
                         consumption.markNeedAdd(MoneyNodeType.Third, false)
                     }
@@ -752,6 +700,7 @@ private fun ThirdPartyInfo(
         } else {
             consumption.third?.let {
                 Text(text = "三方平台: ${it.name}")
+                consumption.thirdPartyFinish = true
                 finish()
             }
         }
@@ -763,11 +712,10 @@ private fun ServiceInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
     onClickService: () -> Unit,
-    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        if (!isFinished) {
+        if (!consumption.serviceFinish) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -783,6 +731,7 @@ private fun ServiceInfo(
             it.desc?.takeIf { d -> d.isNotBlank() }?.let { desc ->
                 Text(desc)
             }
+            consumption.serviceFinish = true
             finish()
         }
     }
@@ -792,11 +741,10 @@ private fun ServiceInfo(
 private fun MoneyInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
-    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        if (!isFinished) {
+        if (!consumption.moneyFinish && !consumption.showMoneyInput) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -839,6 +787,65 @@ private fun MoneyInfo(
         } else {
             consumption.money?.let { money ->
                 Text("金额: ${money.displayStr}")
+                consumption.moneyFinish = true
+                finish()
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun MoneyThirdInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    finish: () -> Unit
+) {
+    Column(modifier = modifier) {
+        if (!consumption.moneyThirdFinish && !consumption.showThirdMoneyInput) {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    consumption.showThirdMoneyInput = true
+                }
+            ) {
+                Text(text = "确认三方平台金额")
+            }
+        }
+        if (consumption.showThirdMoneyInput) {
+            val moneyInputState = remember { MoneyInputState() }
+            var expression by remember { mutableStateOf("") }
+            var value: BigDecimal? by remember { mutableStateOf(BigDecimal.ZERO) }
+            var err: String? by remember { mutableStateOf(null) }
+            LaunchedEffect(Unit) {
+                moneyInputState.expressionDataFlow.collect {
+                    expression = it.expr
+                    value = it.value
+                    err = it.err
+                }
+            }
+            MoneyExpr(
+                label = "价格",
+                expression = expression,
+                initial = null,
+                value = value,
+                err = err
+            )
+            MoneyInput2(inputState = moneyInputState)
+            value?.let {
+                Button(
+                    onClick = {
+                        consumption.moneyThird = it
+                        consumption.showThirdMoneyInput = false
+                    }
+                ) {
+                    Text("确认金额: ${it.displayStr}")
+                }
+            }
+        } else {
+            consumption.moneyThird?.let { money ->
+                Text("三方平台收款: ${money.displayStr}")
+                consumption.moneyThirdFinish = true
                 finish()
             }
         }
@@ -849,12 +856,12 @@ private fun MoneyInfo(
 private fun CardInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
+    cache: ConsumeCache,
     onClickCard: () -> Unit,
-    isFinished: Boolean,
     finish: () -> Unit
 ) {
     Column(modifier = modifier) {
-        if (!isFinished) {
+        if (!consumption.cardFinish && !consumption.needAdd(MoneyNodeType.Card)) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -865,7 +872,8 @@ private fun CardInfo(
             }
         }
         if (consumption.needAdd(MoneyNodeType.Card)) {
-            var selectedCardInfo: CardType? by remember { mutableStateOf(null) }
+            val scope = rememberCoroutineScope()
+            var selectedCardType: CardType? by remember { mutableStateOf(null) }
             val phoneNumbers = remember { mutableStateListOf("") }
             LazyColumn(
                 modifier = Modifier
@@ -879,7 +887,7 @@ private fun CardInfo(
                             .fillMaxWidth()
                             .wrapContentHeight()
                     ) {
-                        selectedCardInfo = it
+                        selectedCardType = it
                     }
                 }
                 item {
@@ -901,13 +909,17 @@ private fun CardInfo(
                 }
             }
             Button(onClick = {
-                val cardInfo = selectedCardInfo ?: return@Button
+                val cardType = selectedCardType ?: return@Button
                 consumption.card = buildMoneyNode {
-                    name = cardInfo.name
+                    name = cardType.name
                     type = MoneyNodeType.Card
                     keys = phoneNumbers
-                    cardTypeId = cardInfo.id
+                    cardTypeId = cardType.id
                     cardValid = true
+                }.also {
+                    scope.launch(Dispatchers.IO) {
+                        cache.commit(consumption to it)
+                    }
                 }
                 consumption.markNeedAdd(MoneyNodeType.Card, false)
             }) {
@@ -946,6 +958,7 @@ private fun CardInfo(
                     Text("起充: ${it.price.displayStr}")
                     Text("折扣: ${it.discount}")
                 }
+                consumption.cardFinish = true
                 finish()
             }
         }
@@ -956,12 +969,11 @@ private fun CardInfo(
 private fun RemarkInfo(
     modifier: Modifier = Modifier,
     consumption: Consumption,
-    isFinished: Boolean,
     finish: () -> Unit
 ) {
     var remarkInput by remember { mutableStateOf("") }
     Row(modifier = modifier) {
-        if (!isFinished) {
+        if (!consumption.remarkFinish) {
             EasyTextField(
                 modifier = Modifier.weight(1f),
                 value = remarkInput,
@@ -972,6 +984,7 @@ private fun RemarkInfo(
             TextButton(
                 onClick = {
                     consumption.remark = remarkInput
+                    consumption.remarkFinish = true
                     finish()
                 }
             ) {
@@ -987,6 +1000,7 @@ private fun RemarkInfo(
 private fun QueryMoneyNodeDialog(
     onDismissRequest: () -> Unit,
     consumptions: List<Consumption>,
+    cache: ConsumeCache,
     index: Int,
     queryType: MoneyNodeType,
     queryState: TextFieldState,
@@ -1005,19 +1019,18 @@ private fun QueryMoneyNodeDialog(
                     queryCard(
                         query = query,
                         customer = it
-                    )
-                }
+                    ).toMutableList()
+                } ?: mutableListOf()
             } else {
                 queryMoneyNode(
                     query = query,
                     types = setOf(queryType),
-                )
+                ).toMutableList()
             }
+            cache.merge(res, queryType, consumption.customer)
             withContext(Dispatchers.Main) {
                 queryResult.clear()
-                if (res != null) {
-                    queryResult.addAll(res)
-                }
+                queryResult.addAll(res)
             }
         }
     }
@@ -1161,6 +1174,183 @@ private fun QueryServiceDialog(
     }
 }
 
-private fun submitConsumptions(consumptions: List<Consumption>) {
+private suspend fun submitConsumptions(consumptions: List<Consumption>, cache: ConsumeCache) {
+    // stage 1: add all money nodes and services
+    cache.flush(consumptions)
+    // stage 2: add bills
+    val public = FSDB.getPublic()
+    val outside = FSDB.getOutside()
+    for (consumption in consumptions) {
+        when (consumption.type) {
+            ConsumptionType.Purchase -> {
+                val customer = consumption.customer.checkAndGet()
+                val money = consumption.money ?: errorInTransaction("money is null")
+                val remark = consumption.remark ?: ""
+                val service = consumption.service.checkAndGet()
+                val servant = consumption.servant.checkAndGet()
+                val bill = buildBill {
+                    fromId = customer.id
+                    toId = public.id
+                    this.money = money
+                    this.remark = remark
+                    this.service = service.id
+                    this.servant = servant.id
+                }
+                FSDB.insertBill(bill)
+            }
 
+            ConsumptionType.Deposit -> {
+                val customer = consumption.customer.checkAndGet()
+                val card = consumption.card.checkAndGet()
+                val money = consumption.money ?: errorInTransaction("money is null")
+                val remark = consumption.remark ?: ""
+                val bill1 = buildBill {
+                    fromId = customer.id
+                    toId = public.id
+                    this.money = money
+                    this.remark = remark
+                }
+                val bill2 = buildBill {
+                    fromId = customer.id
+                    toId = card.id
+                    this.money = money
+                    this.remark = remark
+                }
+                FSDB.insertBill(bill1, bill2)
+            }
+
+            ConsumptionType.UseCard -> {
+                val service = consumption.service.checkAndGet()
+                val servant = consumption.servant.checkAndGet()
+                val card = consumption.card.checkAndGet()
+                val money = consumption.money ?: errorInTransaction("money is null")
+                val remark = consumption.remark ?: ""
+                val bill = buildBill {
+                    fromId = card.id
+                    toId = outside.id
+                    this.money = money
+                    this.remark = remark
+                    this.service = service.id
+                    this.servant = servant.id
+                }
+                FSDB.insertBill(bill)
+            }
+
+            ConsumptionType.ThirdParty -> {
+                val customer = consumption.customer.checkAndGet()
+                val service = consumption.service.checkAndGet()
+                val servant = consumption.servant.checkAndGet()
+                val third = consumption.third.checkAndGet()
+                val moneyThird = consumption.moneyThird ?: errorInTransaction("moneyThird is null")
+                val money = consumption.money ?: errorInTransaction("money is null")
+                val remark = consumption.remark ?: ""
+                val bill1 = buildBill {
+                    fromId = customer.id
+                    toId = third.id
+                    this.money = moneyThird
+                    this.remark = remark
+                    this.service = service.id
+                    this.servant = servant.id
+                }
+                val bill2 = buildBill {
+                    fromId = third.id
+                    toId = public.id
+                    this.money = money
+                    this.remark = remark
+                    this.service = service.id
+                    this.servant = servant.id
+                }
+                FSDB.insertBill(bill1, bill2)
+            }
+
+            else -> {}
+        }
+    }
+}
+
+private fun MassageService?.checkAndGet(): MassageService {
+    if (this == null || this.id == 0L) {
+        errorInTransaction("null or invalid service: ${this?.name}")
+    }
+    return this
+}
+
+private fun MoneyNode?.checkAndGet(): MoneyNode {
+    if (this == null || this.id == 0L) {
+        errorInTransaction("null or invalid money node: ${this?.name}, ${this?.type?.str}")
+    }
+    return this
+}
+
+class ConsumeCache {
+    private val moneyNodePairs = mutableStateListOf<Pair<Consumption, MoneyNode>>()
+    private val mutex = Mutex()
+
+    suspend fun commit(vararg pairs: Pair<Consumption, MoneyNode>) {
+        mutex.withLock {
+            for (pair in pairs) {
+                if (FSDB.isMoneyNodeExists(pair.second)) {
+                    continue
+                }
+                if (!moneyNodePairs.contains(pair)) {
+                    moneyNodePairs.add(pair)
+                }
+            }
+        }
+    }
+
+    fun merge(target: MutableCollection<MoneyNode>, type: MoneyNodeType, customer: MoneyNode?) {
+        for ((consumption, node) in moneyNodePairs) {
+            if (type == MoneyNodeType.Card) {
+                if (customer != null && node.type == type && consumption.customer == customer) {
+                    target.add(node)
+                }
+                continue
+            }
+            if (node.type == type && !target.contains(node)) {
+                target.add(node)
+            }
+        }
+    }
+
+    suspend fun flush(consumptions: List<Consumption>) {
+        mutex.withLock {
+            for ((_, node) in moneyNodePairs) {
+                if (!FSDB.isMoneyNodeExists(node)) {
+                    val id = FSDB.insertMoneyNode(node).firstOrNull()
+                    if (id != null && id > 0L) {
+                        updateConsumption(node, consumptions, id)
+                        continue
+                    }
+                }
+                errorInTransaction("failure on add node: $node")
+            }
+        }
+    }
+
+    private suspend fun updateConsumption(
+        node: MoneyNode,
+        consumptions: List<Consumption>,
+        id: Long
+    ) {
+        for (consumption in consumptions) {
+            when (node) {
+                consumption.customer -> {
+                    consumption.customer = FSDB.getMoneyNode(id)
+                }
+
+                consumption.card -> {
+                    consumption.card = FSDB.getMoneyNode(id)
+                }
+
+                consumption.third -> {
+                    consumption.third = FSDB.getMoneyNode(id)
+                }
+            }
+        }
+    }
+}
+
+private fun errorInTransaction(err: String): Nothing {
+    throw RuntimeException(err)
 }

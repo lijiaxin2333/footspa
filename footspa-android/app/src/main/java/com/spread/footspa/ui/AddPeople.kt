@@ -23,13 +23,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.spread.footspa.db.FSDB
+import com.spread.footspa.db.FSDB.Companion.queryMoneyNode
 import com.spread.footspa.db.MoneyNode
 import com.spread.footspa.db.MoneyNodeType
 import com.spread.footspa.db.NODE_TYPE_CUSTOMER
 import com.spread.footspa.db.NODE_TYPE_EMPLOYEE
 import com.spread.footspa.db.NODE_TYPE_EMPLOYER
 import com.spread.footspa.db.displayStr
-import com.spread.footspa.db.queryMoneyNode
 import com.spread.footspa.ui.common.MoneyNodeSearchInputSimple
 import com.spread.footspa.ui.common.PhoneNumberInput
 import com.spread.footspa.ui.common.SelectOneOptions

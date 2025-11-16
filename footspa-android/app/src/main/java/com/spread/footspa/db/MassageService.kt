@@ -3,13 +3,7 @@ package com.spread.footspa.db
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.frosch2010.fuzzywuzzy_kotlin.FuzzySearch
-import com.github.promeg.pinyinhelper.Pinyin
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import java.math.BigDecimal
-import java.util.Locale
 
 
 @Entity(tableName = SQLConst.TABLE_NAME_MASSAGE_SERVICE)
@@ -38,51 +32,3 @@ data class MassageService(
     }
 }
 
-suspend fun CoroutineScope.queryMassageService(
-    query: String,
-    services: List<MassageService>,
-    minScore: Int = 1,
-    top: Int = 10
-): List<MassageService> {
-    val nameCandidates = async(Dispatchers.IO) {
-        FuzzySearch.extractAll(
-            query = query,
-            choices = services.map { it.name }
-        )
-    }
-    val descCandidates = async(Dispatchers.IO) {
-        FuzzySearch.extractAll(
-            query = query,
-            choices = services.map { it.desc ?: "" }
-        )
-    }
-    val priceCandidates = async(Dispatchers.IO) {
-        FuzzySearch.extractAll(
-            query = query,
-            choices = services.map { it.price.toPlainString() }
-        )
-    }
-    val pinyinCandidates = async(Dispatchers.IO) {
-        FuzzySearch.extractAll(
-            query = query,
-            choices = services.map { Pinyin.toPinyin(it.name, "").lowercase(Locale.getDefault()) }
-        )
-    }
-    val allCandidatesDuplicated =
-        (nameCandidates.await() + descCandidates.await() + priceCandidates.await() + pinyinCandidates.await())
-            .sortedByDescending { it.score }
-    val finalRes = mutableListOf<MassageService>()
-    val dedup = hashSetOf<Int>()
-    for (candidate in allCandidatesDuplicated) {
-        val index = candidate.index
-        val node = services[index]
-        if (dedup.contains(index) || finalRes.contains(node) || candidate.score < minScore) {
-            continue
-        }
-        finalRes.add(node)
-        if (finalRes.size >= top) {
-            break
-        }
-    }
-    return finalRes
-}

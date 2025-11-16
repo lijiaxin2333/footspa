@@ -3,7 +3,6 @@ package com.spread.footspa.db
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -47,6 +46,26 @@ abstract class FSDao {
     @Query("SELECT * FROM ${SQLConst.TABLE_NAME_CARD_TYPE}")
     abstract suspend fun getAllCardTypes(): List<CardType>
 
+    @Query("SELECT EXISTS(SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE id = :id)")
+    abstract suspend fun isMoneyNodeExists(id: Long): Boolean
+
+    @Query("SELECT EXISTS(SELECT * FROM ${SQLConst.TABLE_NAME_MASSAGE_SERVICE} WHERE id = :id)")
+    abstract suspend fun isMassageServiceExists(id: Long): Boolean
+
+    @Query("SELECT EXISTS(SELECT * FROM ${SQLConst.TABLE_NAME_BILL} WHERE id = :id)")
+    abstract suspend fun isBillExists(id: Long): Boolean
+
+    @Query("SELECT EXISTS(SELECT * FROM ${SQLConst.TABLE_NAME_CARD_TYPE} WHERE id = :id)")
+    abstract suspend fun isCardTypeExists(id: Long): Boolean
+
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE type = 'Public' LIMIT 1")
+    abstract suspend fun getPublic(): MoneyNode
+
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE type = 'Outside' LIMIT 1")
+    abstract suspend fun getOutside(): MoneyNode
+
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE id = :id LIMIT 1")
+    abstract suspend fun getMoneyNode(id: Long): MoneyNode?
 
     suspend fun checkDBHealthy(): Boolean {
         // only 1 public
