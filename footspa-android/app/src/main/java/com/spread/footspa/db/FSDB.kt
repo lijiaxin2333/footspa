@@ -327,7 +327,7 @@ abstract class FSDB : RoomDatabase() {
         }
 
         suspend fun CoroutineScope.queryCardWithBalance(
-            query: String,
+            query: String = "",
             customer: MoneyNode,
             minScore: Int = 1,
             top: Int = 10
@@ -344,8 +344,13 @@ abstract class FSDB : RoomDatabase() {
                 for (bill in bills) {
                     if (bill.fromId == customer.id) {
                         val node = choices.find { it.id == bill.toId }
-                        if (node != null && node.type == MoneyNodeType.Card && node.cardValid == true && !customerCandidates.containsKey(node)) {
-                            customerCandidates[node] = bill.money
+                        if (node != null && node.type == MoneyNodeType.Card && node.cardValid == true) {
+                            val money = customerCandidates[node]
+                            if (money == null) {
+                                customerCandidates[node] = bill.money
+                            } else {
+                                customerCandidates[node] = money + bill.money
+                            }
                         }
                     }
                 }
@@ -354,7 +359,7 @@ abstract class FSDB : RoomDatabase() {
                     if (bill.toId != outside.id) {
                         continue
                     }
-                    val card = customerCandidates.keys.find { it.id == bill.id }
+                    val card = customerCandidates.keys.find { it.id == bill.fromId }
                     if (card != null) {
                         // from card to outside
                         val money = customerCandidates[card]

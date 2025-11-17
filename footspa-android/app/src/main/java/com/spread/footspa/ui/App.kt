@@ -45,6 +45,9 @@ sealed interface Route {
 
     @Serializable
     data object People : Route
+
+    @Serializable
+    data object Customer : Route
 }
 
 @Composable
@@ -82,6 +85,9 @@ fun App() {
                 composable<Route.People> {
                     PeopleScreen(modifier = Modifier.fillMaxSize())
                 }
+                composable<Route.Customer> {
+                    CustomerScreen(modifier = Modifier.fillMaxSize())
+                }
             }
         }
     }
@@ -118,6 +124,9 @@ fun MainScreen(modifier: Modifier = Modifier, navController: NavController) {
             }
             item {
                 MainButton(navController, "人员管理", Route.People)
+            }
+            item {
+                MainButton(navController, "顾客管理", Route.Customer)
             }
         }
     }
