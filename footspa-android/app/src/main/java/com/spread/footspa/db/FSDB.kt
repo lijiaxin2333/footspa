@@ -269,18 +269,19 @@ abstract class FSDB : RoomDatabase() {
                 if (choices.isEmpty()) {
                     return@withTransaction
                 }
-                val customerCandidates = run {
-                    val bills = getAllBills()
-                    val l = mutableListOf<MoneyNode>()
-                    for (bill in bills) {
-                        if (bill.fromId == customer.id) {
-                            val node = choices.find { it.id == bill.toId }
-                            if (node != null && node.type == MoneyNodeType.Card && node.cardValid == true) {
-                                l.add(node)
-                            }
+                val bills = getAllBills()
+                val customerCandidates = mutableListOf<MoneyNode>()
+                for (bill in bills) {
+                    if (bill.fromId == customer.id) {
+                        val node = choices.find { it.id == bill.toId }
+                        if (node != null
+                            && node.type == MoneyNodeType.Card
+                            && node.cardValid == true
+                            && !customerCandidates.contains(node)
+                        ) {
+                            customerCandidates.add(node)
                         }
                     }
-                    l
                 }
                 if (query.isEmpty()) {
                     finalRes.addAll(customerCandidates)
@@ -343,9 +344,8 @@ abstract class FSDB : RoomDatabase() {
                 for (bill in bills) {
                     if (bill.fromId == customer.id) {
                         val node = choices.find { it.id == bill.toId }
-                        if (node != null && node.type == MoneyNodeType.Card && node.cardValid == true) {
-                            val money = customerCandidates[node] ?: BigDecimal.ZERO
-                            customerCandidates[node] = money
+                        if (node != null && node.type == MoneyNodeType.Card && node.cardValid == true && !customerCandidates.containsKey(node)) {
+                            customerCandidates[node] = bill.money
                         }
                     }
                 }
@@ -458,6 +458,9 @@ abstract class FSDB : RoomDatabase() {
         }
 
         suspend fun queryCardOwner(card: MoneyNode): MoneyNode {
+            if (card.type != MoneyNodeType.Card) {
+                throw IllegalArgumentException("card must be a card node")
+            }
             val res = mutableListOf<MoneyNode>()
             db.withTransaction {
                 val bills = getAllBills()
@@ -474,6 +477,29 @@ abstract class FSDB : RoomDatabase() {
                 throw IllegalStateException("more than 1 owner of card ${card.id}")
             }
             return res[0]
+        }
+
+        suspend fun queryCardBalance(card: MoneyNode): BigDecimal {
+            var ballance = BigDecimal.ZERO
+            db.withTransaction {
+                if (card.type != MoneyNodeType.Card) {
+                    throw IllegalArgumentException("card type invalid")
+                }
+                val owner = queryCardOwner(card)
+                if (owner.type != MoneyNodeType.Customer) {
+                    throw IllegalArgumentException("card owner type invalid")
+                }
+                val outside = getOutside()
+                val bills = getAllBills()
+                for (bill in bills) {
+                    if (bill.fromId == owner.id && bill.toId == card.id && bill.valid) {
+                        ballance += bill.money
+                    } else if (bill.fromId == card.id && bill.toId == outside.id && bill.valid) {
+                        ballance -= bill.money
+                    }
+                }
+            }
+            return ballance
         }
     }
 

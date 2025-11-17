@@ -1,5 +1,6 @@
 package com.spread.footspa.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -49,11 +51,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.room.withTransaction
 import com.spread.footspa.common.displayStr
+import com.spread.footspa.db.Bill
 import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.db.FSDB.Companion.queryCard
@@ -76,6 +80,7 @@ import com.spread.footspa.ui.common.NewNodeChip
 import com.spread.footspa.ui.common.PhoneNumberInput
 import com.spread.footspa.ui.common.SelectOneOptions
 import com.spread.footspa.ui.common.StepColumn
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -143,6 +148,8 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
     var serviceDialogIndex by remember { mutableIntStateOf(-1) }
     var servantDialogIndex by remember { mutableIntStateOf(-1) }
     var thirdDialogIndex by remember { mutableIntStateOf(-1) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    var confirmDialogResult by remember { mutableStateOf(CompletableDeferred<Boolean>()) }
     LazyColumn(modifier = modifier) {
         itemsIndexed(consumptions) { index, consumption ->
             Row(
@@ -213,11 +220,41 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                     }
                     if (consumptions.all { it.ready }) {
                         val scope = rememberCoroutineScope()
+                        val ctx = LocalContext.current
                         OutlinedButton(
                             onClick = {
-                                scope.launch(Dispatchers.IO) {
-                                    FSDB.db.withTransaction {
-                                        submitConsumptions(consumptions, cache)
+                                scope.launch(Dispatchers.Main) {
+                                    showConfirmDialog = true
+                                    confirmDialogResult = CompletableDeferred()
+                                    val confirm = confirmDialogResult.await()
+                                    if (confirm) {
+                                        kotlin.runCatching {
+                                            FSDB.db.withTransaction {
+                                                submitConsumptions(consumptions, cache)
+                                            }
+                                        }.onFailure {
+                                            withContext(Dispatchers.Main) {
+                                                Toast.makeText(
+                                                    ctx,
+                                                    "提交失败",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }.onSuccess {
+                                            withContext(Dispatchers.Main) {
+                                                Toast.makeText(
+                                                    ctx,
+                                                    "提交成功",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    } else {
+                                        Toast.makeText(
+                                            ctx,
+                                            "取消成功",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 }
                             }
@@ -292,6 +329,34 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
             index = thirdDialogIndex,
             queryType = MoneyNodeType.Third,
             queryState = thirdQueryState
+        )
+    }
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                confirmDialogResult.complete(false)
+                showConfirmDialog = false
+            },
+            properties = DialogProperties(dismissOnBackPress = false),
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDialogResult.complete(true)
+                    showConfirmDialog = false
+                }) {
+                    Text(text = "确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    confirmDialogResult.complete(false)
+                    showConfirmDialog = false
+                }) {
+                    Text(text = "取消")
+                }
+            },
+            title = {
+                Text(text = "确定提交吗？")
+            }
         )
     }
 }
@@ -1174,12 +1239,16 @@ private fun QueryServiceDialog(
     }
 }
 
-private suspend fun submitConsumptions(consumptions: List<Consumption>, cache: ConsumeCache) {
+private suspend fun submitConsumptions(
+    consumptions: List<Consumption>,
+    cache: ConsumeCache
+) {
     // stage 1: add all money nodes and services
     cache.flush(consumptions)
     // stage 2: add bills
     val public = FSDB.getPublic()
     val outside = FSDB.getOutside()
+    val bills = mutableListOf<Bill>()
     for (consumption in consumptions) {
         when (consumption.type) {
             ConsumptionType.Purchase -> {
@@ -1196,7 +1265,7 @@ private suspend fun submitConsumptions(consumptions: List<Consumption>, cache: C
                     this.service = service.id
                     this.servant = servant.id
                 }
-                FSDB.insertBill(bill)
+                bills.add(bill)
             }
 
             ConsumptionType.Deposit -> {
@@ -1216,7 +1285,8 @@ private suspend fun submitConsumptions(consumptions: List<Consumption>, cache: C
                     this.money = money
                     this.remark = remark
                 }
-                FSDB.insertBill(bill1, bill2)
+                bills.add(bill1)
+                bills.add(bill2)
             }
 
             ConsumptionType.UseCard -> {
@@ -1233,7 +1303,7 @@ private suspend fun submitConsumptions(consumptions: List<Consumption>, cache: C
                     this.service = service.id
                     this.servant = servant.id
                 }
-                FSDB.insertBill(bill)
+                bills.add(bill)
             }
 
             ConsumptionType.ThirdParty -> {
@@ -1260,12 +1330,14 @@ private suspend fun submitConsumptions(consumptions: List<Consumption>, cache: C
                     this.service = service.id
                     this.servant = servant.id
                 }
-                FSDB.insertBill(bill1, bill2)
+                bills.add(bill1)
+                bills.add(bill2)
             }
 
             else -> {}
         }
     }
+    FSDB.insertBill(*bills.toTypedArray())
 }
 
 private fun MassageService?.checkAndGet(): MassageService {
@@ -1312,6 +1384,7 @@ class ConsumeCache {
             }
         }
     }
+
 
     suspend fun flush(consumptions: List<Consumption>) {
         mutex.withLock {
