@@ -472,14 +472,14 @@ abstract class FSDB : RoomDatabase() {
                 for (bill in bills) {
                     if (bill.toId == card.id) {
                         val node = getMoneyNode(bill.fromId)
-                        if (node != null && node.type == MoneyNodeType.Customer) {
+                        if (node != null && node.type == MoneyNodeType.Customer && !res.contains(node)) {
                             res.add(node)
                         }
                     }
                 }
             }
             if (res.size != 1) {
-                throw IllegalStateException("more than 1 owner of card ${card.id}")
+                error("more than 1 owner of card ${card.id}")
             }
             return res[0]
         }
@@ -488,11 +488,11 @@ abstract class FSDB : RoomDatabase() {
             var ballance = BigDecimal.ZERO
             db.withTransaction {
                 if (card.type != MoneyNodeType.Card) {
-                    throw IllegalArgumentException("card type invalid")
+                    error("card type invalid")
                 }
                 val owner = queryCardOwner(card)
                 if (owner.type != MoneyNodeType.Customer) {
-                    throw IllegalArgumentException("card owner type invalid")
+                    error("card owner type invalid")
                 }
                 val outside = getOutside()
                 val bills = getAllBills()

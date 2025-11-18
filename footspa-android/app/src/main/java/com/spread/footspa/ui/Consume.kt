@@ -2,6 +2,8 @@ package com.spread.footspa.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -148,8 +151,17 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
     var serviceDialogIndex by remember { mutableIntStateOf(-1) }
     var servantDialogIndex by remember { mutableIntStateOf(-1) }
     var thirdDialogIndex by remember { mutableIntStateOf(-1) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
-    var confirmDialogResult by remember { mutableStateOf(CompletableDeferred<Boolean>()) }
+    val previewInfo = remember {
+        mutableStateMapOf<MoneyNode, List<Pair<MoneyNode, ConsumeCache.BalanceTrace>>>()
+    }
+    var confirmDialogResult: CompletableDeferred<Boolean>? by remember { mutableStateOf(null) }
+    val completeDialog: CompletableDeferred<Boolean>.(Boolean) -> Unit = remember {
+        {
+            complete(it)
+            confirmDialogResult = null
+            previewInfo.clear()
+        }
+    }
     LazyColumn(modifier = modifier) {
         itemsIndexed(consumptions) { index, consumption ->
             Row(
@@ -224,9 +236,14 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                         OutlinedButton(
                             onClick = {
                                 scope.launch(Dispatchers.Main) {
-                                    showConfirmDialog = true
+                                    withContext(Dispatchers.IO) {
+                                        cache.getPreviewInfo(consumptions)
+                                    }.let {
+                                        previewInfo.clear()
+                                        previewInfo.putAll(it)
+                                    }
                                     confirmDialogResult = CompletableDeferred()
-                                    val confirm = confirmDialogResult.await()
+                                    val confirm = confirmDialogResult?.await() ?: return@launch
                                     if (confirm) {
                                         kotlin.runCatching {
                                             FSDB.db.withTransaction {
@@ -331,33 +348,61 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
             queryState = thirdQueryState
         )
     }
-    if (showConfirmDialog) {
+    confirmDialogResult?.run {
         AlertDialog(
             onDismissRequest = {
-                confirmDialogResult.complete(false)
-                showConfirmDialog = false
+                completeDialog(false)
             },
             properties = DialogProperties(dismissOnBackPress = false),
             confirmButton = {
                 TextButton(onClick = {
-                    confirmDialogResult.complete(true)
-                    showConfirmDialog = false
+                    completeDialog(true)
                 }) {
                     Text(text = "确定")
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    confirmDialogResult.complete(false)
-                    showConfirmDialog = false
+                    completeDialog(false)
                 }) {
                     Text(text = "取消")
                 }
             },
             title = {
                 Text(text = "确定提交吗？")
+            },
+            text = {
+                PreviewList(previewInfo)
             }
         )
+    }
+}
+
+@Composable
+private fun PreviewList(previewInfo: Map<MoneyNode, List<Pair<MoneyNode, ConsumeCache.BalanceTrace>>>) {
+    Column(
+        Modifier.scrollable(
+            state = rememberScrollState(),
+            orientation = Orientation.Vertical
+        )
+    ) {
+        for ((customer, cardInfoList) in previewInfo) {
+            Column(modifier = Modifier.padding(vertical = 5.dp)) {
+                Text("${customer.name}的消费：")
+                for ((card, trace) in cardInfoList) {
+                    Text("\t${card.name}")
+                    Text("\t\t原始余额：${trace.originBalance}")
+                    for (deposit in trace.depositList) {
+                        Text("\t\t\t充值：+${deposit.displayStr}")
+                    }
+                    for (use in trace.useList) {
+                        Text("\t\t\t消费：-${use.displayStr}")
+                    }
+                    Text("\t\t当前余额：${trace.balance}")
+                    HorizontalDivider()
+                }
+            }
+        }
     }
 }
 
@@ -1239,6 +1284,13 @@ private fun QueryServiceDialog(
     }
 }
 
+private suspend fun genPreviewInfo(
+    consumptions: List<Consumption>,
+    cache: ConsumeCache
+) {
+
+}
+
 private suspend fun submitConsumptions(
     consumptions: List<Consumption>,
     cache: ConsumeCache
@@ -1253,7 +1305,7 @@ private suspend fun submitConsumptions(
         when (consumption.type) {
             ConsumptionType.Purchase -> {
                 val customer = consumption.customer.checkAndGet()
-                val money = consumption.money ?: errorInTransaction("money is null")
+                val money = consumption.money.checkAndGet()
                 val remark = consumption.remark ?: ""
                 val service = consumption.service.checkAndGet()
                 val servant = consumption.servant.checkAndGet()
@@ -1271,7 +1323,7 @@ private suspend fun submitConsumptions(
             ConsumptionType.Deposit -> {
                 val customer = consumption.customer.checkAndGet()
                 val card = consumption.card.checkAndGet()
-                val money = consumption.money ?: errorInTransaction("money is null")
+                val money = consumption.money.checkAndGet()
                 val remark = consumption.remark ?: ""
                 val bill1 = buildBill {
                     fromId = customer.id
@@ -1293,7 +1345,7 @@ private suspend fun submitConsumptions(
                 val service = consumption.service.checkAndGet()
                 val servant = consumption.servant.checkAndGet()
                 val card = consumption.card.checkAndGet()
-                val money = consumption.money ?: errorInTransaction("money is null")
+                val money = consumption.money.checkAndGet()
                 val remark = consumption.remark ?: ""
                 val bill = buildBill {
                     fromId = card.id
@@ -1311,8 +1363,8 @@ private suspend fun submitConsumptions(
                 val service = consumption.service.checkAndGet()
                 val servant = consumption.servant.checkAndGet()
                 val third = consumption.third.checkAndGet()
-                val moneyThird = consumption.moneyThird ?: errorInTransaction("moneyThird is null")
-                val money = consumption.money ?: errorInTransaction("money is null")
+                val moneyThird = consumption.moneyThird.checkAndGet()
+                val money = consumption.money.checkAndGet()
                 val remark = consumption.remark ?: ""
                 val bill1 = buildBill {
                     fromId = customer.id
@@ -1338,6 +1390,29 @@ private suspend fun submitConsumptions(
         }
     }
     FSDB.insertBill(*bills.toTypedArray())
+    cache.clear()
+}
+
+
+private fun BigDecimal?.checkAndGet(): BigDecimal {
+    if (this == null || this == BigDecimal.ZERO) {
+        errorInTransaction("money is null or zero")
+    }
+    return this
+}
+
+private fun MassageService?.nonNullGet(): MassageService {
+    if (this == null) {
+        errorInTransaction("null service")
+    }
+    return this
+}
+
+private fun MoneyNode?.nonNullGet(): MoneyNode {
+    if (this == null) {
+        errorInTransaction("null money node")
+    }
+    return this
 }
 
 private fun MassageService?.checkAndGet(): MassageService {
@@ -1385,6 +1460,102 @@ class ConsumeCache {
         }
     }
 
+    class BalanceTrace {
+        val depositList = mutableListOf<BigDecimal>()
+        val useList = mutableListOf<BigDecimal>()
+        var originBalance: BigDecimal = BigDecimal.ZERO
+        var balance: BigDecimal = BigDecimal.ZERO
+    }
+
+    suspend fun getPreviewInfo(consumptions: List<Consumption>): Map<MoneyNode, List<Pair<MoneyNode, BalanceTrace>>> {
+        val ownerCardBalance =
+            mutableMapOf<MoneyNode, MutableList<Pair<MoneyNode, BalanceTrace>>>()
+        mutex.withLock {
+            for (consumption in consumptions) {
+                if (consumption.type == ConsumptionType.Deposit) {
+                    val customer = consumption.customer.nonNullGet()
+                    val card = consumption.card.nonNullGet()
+                    val money = consumption.money.checkAndGet()
+                    val newCustomer = isNewNode(customer)
+                    val newCard = isNewNode(card)
+                    if (newCustomer && !newCard) {
+                        error("新顾客${customer.name}, 老卡${card.name}, 第一次消费的顾客，不能给一张已经存在的卡充值")
+                    }
+                    val thisCustomerCardsInfo = ownerCardBalance[customer]
+                    if (thisCustomerCardsInfo == null) {
+                        ownerCardBalance[customer] = mutableListOf()
+                    }
+                    val thisCustomerCardTrace = ownerCardBalance[customer]!!.find { it.first == card }
+                    if (!newCard) {
+                        val owner = FSDB.queryCardOwner(card)
+                        if (owner != customer) {
+                            error("owner is: ${owner.name} but customer is ${customer.name}")
+                        }
+                        if (thisCustomerCardTrace == null) {
+                            ownerCardBalance[customer]!!.add(card to BalanceTrace().apply {
+                                originBalance = FSDB.queryCardBalance(card)
+                                balance = originBalance + money
+                                depositList.add(money)
+                            })
+                        } else {
+                            thisCustomerCardTrace.second.balance += money
+                            thisCustomerCardTrace.second.depositList.add(money)
+                        }
+                    } else {
+                        if (thisCustomerCardTrace == null) {
+                            ownerCardBalance[customer]!!.add(card to BalanceTrace().apply {
+                                balance = money
+                                depositList.add(money)
+                            })
+                        } else {
+                            thisCustomerCardTrace.second.balance += money
+                            thisCustomerCardTrace.second.depositList.add(money)
+                        }
+                    }
+                }
+            }
+            for (consumption in consumptions) {
+                if (consumption.type == ConsumptionType.UseCard) {
+                    val customer = consumption.customer.nonNullGet()
+                    val card = consumption.card.nonNullGet()
+                    val money = consumption.money.checkAndGet()
+                    val newCustomer = isNewNode(customer)
+                    val newCard = isNewNode(card)
+                    if (newCustomer && !newCard) {
+                        error("新顾客${customer.name}, 老卡${card.name}, 第第一次消费的顾客，不能用一张存在的卡消费")
+                    }
+                    val thisCustomerCardsInfo = ownerCardBalance[customer]
+                    if (thisCustomerCardsInfo == null) {
+                        ownerCardBalance[customer] = mutableListOf()
+                    }
+                    val thisCustomerCardTrace = ownerCardBalance[customer]!!.find { it.first == card }
+                    if (!newCard) {
+                        val owner = FSDB.queryCardOwner(card)
+                        if (owner != customer) {
+                            error("owner is: ${owner.name} but customer is ${customer.name}")
+                        }
+                        if (thisCustomerCardTrace == null) {
+                            ownerCardBalance[customer]!!.add(card to BalanceTrace().apply {
+                                originBalance = FSDB.queryCardBalance(card)
+                                balance = originBalance - money
+                                useList.add(money)
+                            })
+                        } else {
+                            thisCustomerCardTrace.second.balance -= money
+                            thisCustomerCardTrace.second.useList.add(money)
+                        }
+                    } else {
+                        if (thisCustomerCardTrace == null) {
+                            error("card cannot be use without deposit")
+                        }
+                        thisCustomerCardTrace.second.balance -= money
+                        thisCustomerCardTrace.second.useList.add(money)
+                    }
+                }
+            }
+            return ownerCardBalance
+        }
+    }
 
     suspend fun flush(consumptions: List<Consumption>) {
         mutex.withLock {
@@ -1420,6 +1591,16 @@ class ConsumeCache {
                     consumption.third = FSDB.getMoneyNode(id)
                 }
             }
+        }
+    }
+
+    private fun isNewNode(moneyNode: MoneyNode): Boolean {
+        return moneyNodePairs.any { it.second == moneyNode }
+    }
+
+    suspend fun clear() {
+        mutex.withLock {
+            moneyNodePairs.clear()
         }
     }
 }
