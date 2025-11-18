@@ -1,22 +1,26 @@
 package com.spread.footspa.ui
 
-import androidx.compose.animation.defaultDecayAnimationSpec
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -25,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.db.FSDB.Companion.queryCardWithBalance
@@ -86,12 +91,21 @@ fun CustomerScreen(modifier: Modifier = Modifier) {
                     else filteredList.takeIf { it.isNotEmpty() } ?: customerList
             ) { customer ->
                 Column(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        detailCustomer = customer
-                    }
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            detailCustomer = customer
+                        }
                 ) {
-                    Text(text = "姓名: ${customer.name}")
-                    Text(text = "电话: ${customer.keys?.joinToString()}")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(modifier = Modifier.padding(10.dp), text = customer.name)
+                        VerticalDivider()
+                        Icon(
+                            imageVector = Icons.Default.Phone,
+                            contentDescription = "phone number"
+                        )
+                        Text(text = customer.keys?.joinToString() ?: "无电话")
+                    }
                     HorizontalDivider()
                 }
             }
@@ -113,47 +127,57 @@ private fun DetailCustomerDialog(
     onDismiss: () -> Unit
 ) {
     Dialog(
-        onDismissRequest = onDismiss
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnClickOutside = false
+        )
     ) {
-        val balanceInfo = remember { mutableStateListOf<Pair<Map.Entry<MoneyNode, BigDecimal>, CardType>>() }
-        LaunchedEffect(Unit) {
-            launch(Dispatchers.IO) {
-                balanceInfo.clear()
-                val infos = queryCardWithBalance(customer = customer)
-                val l = mutableListOf<Pair<Map.Entry<MoneyNode, BigDecimal>, CardType>>()
-                for (info in infos) {
-                    val type = FSDB.findCardType(info.key)
-                    if (type != null && type.valid) {
-                        l.add(info to type)
+        Card(modifier = Modifier) {
+            val balanceInfo =
+                remember { mutableStateListOf<Pair<Map.Entry<MoneyNode, BigDecimal>, CardType>>() }
+            LaunchedEffect(Unit) {
+                launch(Dispatchers.IO) {
+                    balanceInfo.clear()
+                    val infos = queryCardWithBalance(customer = customer)
+                    val l = mutableListOf<Pair<Map.Entry<MoneyNode, BigDecimal>, CardType>>()
+                    for (info in infos) {
+                        val type = FSDB.findCardType(info.key)
+                        if (type != null && type.valid) {
+                            l.add(info to type)
+                        }
                     }
+                    balanceInfo.addAll(l)
                 }
-                balanceInfo.addAll(l)
             }
-        }
-        LazyColumn(modifier = Modifier.fillMaxWidth().height(300.dp)) {
-            items(balanceInfo) { info ->
-                val card = info.first.key
-                val balance = info.first.value
-                val type = info.second
-                Column(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        onDismiss()
-                    }
-                ) {
-                    Text(text = "卡名: ${card.name}")
-                    Text(text = "电话: ${card.keys?.joinToString()}")
-                    Text(text = "余额: $balance")
-                    Text(text = "起充: ${type.price.toPlainString()}")
-                    Text(text = "折扣: ${type.discount}")
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (type.legacy) {
-                            LegacyCardChip()
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "会员卡信息")
+                LazyColumn(modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp)
+                    .height(500.dp)) {
+                    items(balanceInfo) { info ->
+                        val card = info.first.key
+                        val balance = info.first.value
+                        val type = info.second
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "卡名: ${card.name}")
+                            Text(text = "电话: ${card.keys?.joinToString()}")
+                            Text(text = "余额: $balance")
+                            Text(text = "起充: ${type.price.toPlainString()}")
+                            Text(text = "折扣: ${type.discount}")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (type.legacy) {
+                                    LegacyCardChip()
+                                }
+                                if (card.cardValid == false) {
+                                    InvalidCardChip()
+                                }
+                            }
+                            HorizontalDivider()
                         }
-                        if (card.cardValid == false) {
-                            InvalidCardChip()
-                        }
                     }
-                    HorizontalDivider()
                 }
             }
         }
