@@ -25,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.spread.footspa.ui.card.CardScreen
 import com.spread.footspa.ui.card.CardTypeManagementScreen
+import com.spread.footspa.ui.statistics.IncomeScreen
 import kotlinx.serialization.Serializable
 
 sealed interface Route {
@@ -48,6 +49,9 @@ sealed interface Route {
 
     @Serializable
     data object Customer : Route
+
+    @Serializable
+    data object Income : Route
 }
 
 @Composable
@@ -88,6 +92,9 @@ fun App() {
                 composable<Route.Customer> {
                     CustomerScreen(modifier = Modifier.fillMaxSize())
                 }
+                composable<Route.Income> {
+                    IncomeScreen(modifier = Modifier.fillMaxSize())
+                }
             }
         }
     }
@@ -106,7 +113,7 @@ fun MainScreen(modifier: Modifier = Modifier, navController: NavController) {
                 MainButton(navController, "消费", Route.Consume)
             }
         }
-        HorizontalDivider()
+        HorizontalDivider(modifier = Modifier.padding(vertical = 5.dp))
         LazyVerticalGrid(
             modifier = Modifier
                 .fillMaxWidth()
@@ -127,6 +134,17 @@ fun MainScreen(modifier: Modifier = Modifier, navController: NavController) {
             }
             item {
                 MainButton(navController, "顾客管理", Route.Customer)
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = 5.dp))
+        LazyVerticalGrid(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentSize(),
+            columns = GridCells.Fixed(2)
+        ) {
+            item {
+                MainButton(navController, "收入数据", Route.Income)
             }
         }
     }

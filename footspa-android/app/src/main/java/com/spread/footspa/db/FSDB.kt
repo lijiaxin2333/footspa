@@ -201,6 +201,18 @@ abstract class FSDB : RoomDatabase() {
             return dao.getMoneyNode(id)
         }
 
+        suspend fun getMoneyNodeType(id: Long): MoneyNodeType {
+            return dao.getMoneyNode(id)?.type ?: MoneyNodeType.None
+        }
+
+        suspend fun getBill(id: Long): Bill? {
+            return dao.getBill(id)
+        }
+
+        suspend fun getBillType(id: Long): BillType {
+            return dao.getBill(id)?.type ?: BillType.None
+        }
+
         suspend fun CoroutineScope.queryMoneyNode(
             query: String,
             minScore: Int = 1,
@@ -472,7 +484,10 @@ abstract class FSDB : RoomDatabase() {
                 for (bill in bills) {
                     if (bill.toId == card.id) {
                         val node = getMoneyNode(bill.fromId)
-                        if (node != null && node.type == MoneyNodeType.Customer && !res.contains(node)) {
+                        if (node != null && node.type == MoneyNodeType.Customer && !res.contains(
+                                node
+                            )
+                        ) {
                             res.add(node)
                         }
                     }

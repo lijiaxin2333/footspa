@@ -58,14 +58,18 @@ abstract class FSDao {
     @Query("SELECT EXISTS(SELECT * FROM ${SQLConst.TABLE_NAME_CARD_TYPE} WHERE id = :id)")
     abstract suspend fun isCardTypeExists(id: Long): Boolean
 
-    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE type = 'Public' LIMIT 1")
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE type = 'public' LIMIT 1")
     abstract suspend fun getPublic(): MoneyNode
 
-    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE type = 'Outside' LIMIT 1")
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE type = 'outside' LIMIT 1")
     abstract suspend fun getOutside(): MoneyNode
 
     @Query("SELECT * FROM ${SQLConst.TABLE_NAME_MONEY_NODE} WHERE id = :id LIMIT 1")
     abstract suspend fun getMoneyNode(id: Long): MoneyNode?
+
+    @Query("SELECT * FROM ${SQLConst.TABLE_NAME_BILL} WHERE id = :id LIMIT 1")
+    abstract suspend fun getBill(id: Long): Bill?
+
 
     suspend fun checkDBHealthy(): Boolean {
         // only 1 public

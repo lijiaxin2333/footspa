@@ -16,19 +16,21 @@ data class Bill(
     @ColumnInfo("tags") val tags: List<String>,
     @ColumnInfo("remark") val remark: String,
     @ColumnInfo("service") val service: Long,
-    @ColumnInfo("servant") val servant: Long
+    @ColumnInfo("servant") val servant: Long,
+    @ColumnInfo("type") val type: BillType
 )
 
 class BillBuilder {
     var date = System.currentTimeMillis()
     var fromId = 0L
     var toId = 0L
-    var money = BigDecimal.ZERO
+    var money: BigDecimal = BigDecimal.ZERO
     var valid = true
     var tags: List<String> = emptyList()
     var remark = ""
     var service = 0L
     var servant = 0L
+    var type = BillType.None
 }
 
 inline fun buildBill(init: BillBuilder.() -> Unit): Bill {
@@ -45,6 +47,7 @@ inline fun buildBill(init: BillBuilder.() -> Unit): Bill {
         tags = builder.tags,
         remark = builder.remark,
         service = builder.service,
-        servant = builder.servant
+        servant = builder.servant,
+        type = builder.type
     )
 }

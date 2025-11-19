@@ -149,12 +149,17 @@ private fun DetailCustomerDialog(
                     balanceInfo.addAll(l)
                 }
             }
-            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(text = "会员卡信息")
-                LazyColumn(modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp)
-                    .height(500.dp)) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp)
+                        .height(500.dp)
+                ) {
                     items(balanceInfo) { info ->
                         val card = info.first.key
                         val balance = info.first.value

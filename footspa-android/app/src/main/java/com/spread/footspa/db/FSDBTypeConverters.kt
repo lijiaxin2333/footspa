@@ -30,4 +30,24 @@ class FSDBTypeConverters {
         return json.encodeToString(value)
     }
 
+    @TypeConverter
+    fun stringToMoneyNodeType(value: String): MoneyNodeType {
+        return MoneyNodeType.entries.firstOrNull { it.str == value } ?: MoneyNodeType.None
+    }
+
+    @TypeConverter
+    fun moneyNodeTypeToString(value: MoneyNodeType): String {
+        return value.str
+    }
+
+    @TypeConverter
+    fun stringToBillType(value: String): BillType {
+        return BillType.entries.firstOrNull { it.str == value } ?: BillType.None
+    }
+
+    @TypeConverter
+    fun billTypeToString(value: BillType): String {
+        return value.str
+    }
+
 }

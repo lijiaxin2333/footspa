@@ -61,6 +61,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.room.withTransaction
 import com.spread.footspa.common.displayStr
 import com.spread.footspa.db.Bill
+import com.spread.footspa.db.BillType
 import com.spread.footspa.db.CardType
 import com.spread.footspa.db.FSDB
 import com.spread.footspa.db.FSDB.Companion.queryCard
@@ -144,6 +145,7 @@ class Consumption {
 
 @Composable
 fun ConsumeScreen(modifier: Modifier = Modifier) {
+    val scope = rememberCoroutineScope()
     val consumptions = remember { mutableStateListOf(Consumption()) }
     val cache = remember { ConsumeCache() }
     var customerDialogIndex by remember { mutableIntStateOf(-1) }
@@ -200,6 +202,9 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                     },
                     onDelete = {
                         consumptions.remove(consumption)
+                        scope.launch(Dispatchers.IO) {
+                            cache.remove(consumption)
+                        }
                     }
                 )
             }
@@ -231,7 +236,6 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                         }
                     }
                     if (consumptions.all { it.ready }) {
-                        val scope = rememberCoroutineScope()
                         val ctx = LocalContext.current
                         OutlinedButton(
                             onClick = {
@@ -253,7 +257,7 @@ fun ConsumeScreen(modifier: Modifier = Modifier) {
                                             withContext(Dispatchers.Main) {
                                                 Toast.makeText(
                                                     ctx,
-                                                    "提交失败",
+                                                    "提交失败: ${it.message}",
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             }
@@ -1284,13 +1288,6 @@ private fun QueryServiceDialog(
     }
 }
 
-private suspend fun genPreviewInfo(
-    consumptions: List<Consumption>,
-    cache: ConsumeCache
-) {
-
-}
-
 private suspend fun submitConsumptions(
     consumptions: List<Consumption>,
     cache: ConsumeCache
@@ -1316,6 +1313,7 @@ private suspend fun submitConsumptions(
                     this.remark = remark
                     this.service = service.id
                     this.servant = servant.id
+                    type = BillType.Purchase
                 }
                 bills.add(bill)
             }
@@ -1330,12 +1328,14 @@ private suspend fun submitConsumptions(
                     toId = public.id
                     this.money = money
                     this.remark = remark
+                    type = BillType.Deposit
                 }
                 val bill2 = buildBill {
                     fromId = customer.id
                     toId = card.id
                     this.money = money
                     this.remark = remark
+                    type = BillType.DepositCard
                 }
                 bills.add(bill1)
                 bills.add(bill2)
@@ -1354,6 +1354,7 @@ private suspend fun submitConsumptions(
                     this.remark = remark
                     this.service = service.id
                     this.servant = servant.id
+                    type = BillType.UseCard
                 }
                 bills.add(bill)
             }
@@ -1373,6 +1374,7 @@ private suspend fun submitConsumptions(
                     this.remark = remark
                     this.service = service.id
                     this.servant = servant.id
+                    type = BillType.ThirdPartyDisplay
                 }
                 val bill2 = buildBill {
                     fromId = third.id
@@ -1381,6 +1383,7 @@ private suspend fun submitConsumptions(
                     this.remark = remark
                     this.service = service.id
                     this.servant = servant.id
+                    type = BillType.ThirdPartyReal
                 }
                 bills.add(bill1)
                 bills.add(bill2)
@@ -1446,16 +1449,22 @@ class ConsumeCache {
         }
     }
 
-    fun merge(target: MutableCollection<MoneyNode>, type: MoneyNodeType, customer: MoneyNode?) {
-        for ((consumption, node) in moneyNodePairs) {
-            if (type == MoneyNodeType.Card) {
-                if (customer != null && node.type == type && consumption.customer == customer) {
+    suspend fun merge(
+        target: MutableCollection<MoneyNode>,
+        type: MoneyNodeType,
+        customer: MoneyNode?
+    ) {
+        mutex.withLock {
+            for ((consumption, node) in moneyNodePairs) {
+                if (type == MoneyNodeType.Card) {
+                    if (customer != null && node.type == type && consumption.customer == customer) {
+                        target.add(node)
+                    }
+                    continue
+                }
+                if (node.type == type && !target.contains(node)) {
                     target.add(node)
                 }
-                continue
-            }
-            if (node.type == type && !target.contains(node)) {
-                target.add(node)
             }
         }
     }
@@ -1485,7 +1494,8 @@ class ConsumeCache {
                     if (thisCustomerCardsInfo == null) {
                         ownerCardBalance[customer] = mutableListOf()
                     }
-                    val thisCustomerCardTrace = ownerCardBalance[customer]!!.find { it.first == card }
+                    val thisCustomerCardTrace =
+                        ownerCardBalance[customer]!!.find { it.first == card }
                     if (!newCard) {
                         val owner = FSDB.queryCardOwner(card)
                         if (owner != customer) {
@@ -1528,7 +1538,8 @@ class ConsumeCache {
                     if (thisCustomerCardsInfo == null) {
                         ownerCardBalance[customer] = mutableListOf()
                     }
-                    val thisCustomerCardTrace = ownerCardBalance[customer]!!.find { it.first == card }
+                    val thisCustomerCardTrace =
+                        ownerCardBalance[customer]!!.find { it.first == card }
                     if (!newCard) {
                         val owner = FSDB.queryCardOwner(card)
                         if (owner != customer) {
@@ -1596,6 +1607,20 @@ class ConsumeCache {
 
     private fun isNewNode(moneyNode: MoneyNode): Boolean {
         return moneyNodePairs.any { it.second == moneyNode }
+    }
+
+    suspend fun remove(consumption: Consumption) {
+        mutex.withLock {
+            val removeSet = mutableSetOf<Pair<Consumption, MoneyNode>>()
+            for (pair in moneyNodePairs) {
+                if (pair.first == consumption) {
+                    removeSet.add(pair)
+                }
+            }
+            for (pair in removeSet) {
+                moneyNodePairs.remove(pair)
+            }
+        }
     }
 
     suspend fun clear() {
