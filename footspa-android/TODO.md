@@ -26,3 +26,4 @@
 - [ ] 接入howmuch崩溃能力
 - [ ] 数据库文件分享能力
 - [ ] 触发器sql
+- [ ] money node，service，cardtype热度值
