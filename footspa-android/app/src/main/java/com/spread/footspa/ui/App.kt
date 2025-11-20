@@ -120,9 +120,9 @@ fun MainScreen(modifier: Modifier = Modifier, navController: NavController) {
                 .wrapContentSize(),
             columns = GridCells.Fixed(2)
         ) {
-            item {
-                MainButton(navController, "会员卡管理", Route.Card)
-            }
+//            item {
+//                MainButton(navController, "会员卡管理", Route.Card)
+//            }
             item {
                 MainButton(navController, "卡类管理", Route.CardType)
             }

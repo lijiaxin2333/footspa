@@ -14,6 +14,8 @@ import com.spread.footspa.common.isSameDay
 import com.spread.footspa.db.Bill
 import com.spread.footspa.db.BillType
 import com.spread.footspa.db.FSDB
+import com.spread.footspa.ui.common.DaySelector
+import com.spread.footspa.ui.common.rememberCalendarState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
@@ -82,7 +84,7 @@ fun IncomeScreen(modifier: Modifier = Modifier) {
         }
     }
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        DaySelector(modifier = Modifier.wrapContentSize(), calendarState = calendarState)
+        DaySelector(modifier = Modifier.wrapContentSize(), state = calendarState)
 
     }
 

@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +74,7 @@ import com.spread.footspa.db.MoneyNodeType
 import com.spread.footspa.db.buildBill
 import com.spread.footspa.db.buildMoneyNode
 import com.spread.footspa.ui.card.ChooseCardType
+import com.spread.footspa.ui.common.DateTimePicker
 import com.spread.footspa.ui.common.EasyTextField
 import com.spread.footspa.ui.common.InvalidCardChip
 import com.spread.footspa.ui.common.LegacyCardChip
@@ -84,6 +86,7 @@ import com.spread.footspa.ui.common.NewNodeChip
 import com.spread.footspa.ui.common.PhoneNumberInput
 import com.spread.footspa.ui.common.SelectOneOptions
 import com.spread.footspa.ui.common.StepColumn
+import com.spread.footspa.ui.common.rememberCalendarState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -91,6 +94,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
+import java.text.SimpleDateFormat
+import java.util.Date
 
 enum class ConsumptionType(val str: String) {
     None(""),
@@ -122,6 +127,7 @@ class Consumption {
     val addMap = mutableStateMapOf<String, Boolean>()
     var showMoneyInput by mutableStateOf(false)
     var showThirdMoneyInput by mutableStateOf(false)
+    var time by mutableLongStateOf(System.currentTimeMillis())
 
     var customerFinish by mutableStateOf(false)
     var cardFinish by mutableStateOf(false)
@@ -131,6 +137,7 @@ class Consumption {
     var moneyThirdFinish by mutableStateOf(false)
     var moneyFinish by mutableStateOf(false)
     var remarkFinish by mutableStateOf(false)
+    var timeFinish by mutableStateOf(false)
 
     var ready by mutableStateOf(false)
 
@@ -475,8 +482,13 @@ private fun OneConsumption(
                     add { finish ->
                         RemarkInfo(
                             consumption = consumption,
+                            finish = finish
+                        )
+                    }
+                    add { finish ->
+                        DateTimeInfo(
+                            consumption = consumption,
                             finish = {
-                                finish()
                                 consumption.ready = true
                             }
                         )
@@ -510,6 +522,12 @@ private fun OneConsumption(
                     }
                     add { finish ->
                         RemarkInfo(
+                            consumption = consumption,
+                            finish = finish
+                        )
+                    }
+                    add { finish ->
+                        DateTimeInfo(
                             consumption = consumption,
                             finish = {
                                 finish()
@@ -560,6 +578,12 @@ private fun OneConsumption(
                     }
                     add { finish ->
                         RemarkInfo(
+                            consumption = consumption,
+                            finish = finish
+                        )
+                    }
+                    add { finish ->
+                        DateTimeInfo(
                             consumption = consumption,
                             finish = {
                                 finish()
@@ -616,6 +640,12 @@ private fun OneConsumption(
                     }
                     add { finish ->
                         RemarkInfo(
+                            consumption = consumption,
+                            finish = finish
+                        )
+                    }
+                    add { finish ->
+                        DateTimeInfo(
                             consumption = consumption,
                             finish = {
                                 finish()
@@ -1111,6 +1141,59 @@ private fun RemarkInfo(
 }
 
 @Composable
+private fun DateTimeInfo(
+    modifier: Modifier = Modifier,
+    consumption: Consumption,
+    finish: () -> Unit
+) {
+    if (!consumption.timeFinish) {
+        var showPicker by remember { mutableStateOf(false) }
+        if (showPicker) {
+            val calendarState = rememberCalendarState()
+            DateTimePicker(
+                modifier = modifier,
+                state = calendarState,
+                onSuccess = {
+                    consumption.time = calendarState.timeInMillis
+                    showPicker = false
+                    consumption.timeFinish = true
+                    finish()
+                },
+                onCancel = {
+                    showPicker = false
+                }
+            )
+        } else {
+            Row(
+                modifier = modifier,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    modifier = modifier,
+                    onClick = {
+                        showPicker = true
+                    }
+                ) {
+                    Text(text = "选择时间")
+                }
+                TextButton(
+                    modifier = Modifier.padding(start = 16.dp),
+                    onClick = {
+                        consumption.time = System.currentTimeMillis()
+                        consumption.timeFinish = true
+                        finish()
+                    }
+                ) {
+                    Text(text = "现在")
+                }
+            }
+        }
+    } else {
+        Text(text = "时间: ${SimpleDateFormat().format(Date(consumption.time))}")
+    }
+}
+
+@Composable
 private fun QueryMoneyNodeDialog(
     onDismissRequest: () -> Unit,
     consumptions: List<Consumption>,
@@ -1307,6 +1390,7 @@ private suspend fun submitConsumptions(
                 val service = consumption.service.checkAndGet()
                 val servant = consumption.servant.checkAndGet()
                 val bill = buildBill {
+                    date = consumption.time
                     fromId = customer.id
                     toId = public.id
                     this.money = money
@@ -1324,6 +1408,7 @@ private suspend fun submitConsumptions(
                 val money = consumption.money.checkAndGet()
                 val remark = consumption.remark ?: ""
                 val bill1 = buildBill {
+                    date = consumption.time
                     fromId = customer.id
                     toId = public.id
                     this.money = money
@@ -1331,6 +1416,7 @@ private suspend fun submitConsumptions(
                     type = BillType.Deposit
                 }
                 val bill2 = buildBill {
+                    date = consumption.time
                     fromId = customer.id
                     toId = card.id
                     this.money = money
@@ -1348,6 +1434,7 @@ private suspend fun submitConsumptions(
                 val money = consumption.money.checkAndGet()
                 val remark = consumption.remark ?: ""
                 val bill = buildBill {
+                    date = consumption.time
                     fromId = card.id
                     toId = outside.id
                     this.money = money
@@ -1368,6 +1455,7 @@ private suspend fun submitConsumptions(
                 val money = consumption.money.checkAndGet()
                 val remark = consumption.remark ?: ""
                 val bill1 = buildBill {
+                    date = consumption.time
                     fromId = customer.id
                     toId = third.id
                     this.money = moneyThird
@@ -1377,6 +1465,7 @@ private suspend fun submitConsumptions(
                     type = BillType.ThirdPartyDisplay
                 }
                 val bill2 = buildBill {
+                    date = consumption.time
                     fromId = third.id
                     toId = public.id
                     this.money = money

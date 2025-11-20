@@ -1,4 +1,4 @@
-package com.spread.footspa.ui.statistics
+package com.spread.footspa.ui.common
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,13 +20,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -44,7 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import com.spread.footspa.ui.common.TextConstants
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNot
@@ -56,6 +58,8 @@ class CalendarState internal constructor(
     initialCalendar: Calendar
 ) {
     private val _calendar = initialCalendar.clone() as Calendar
+
+    private val initialTime = initialCalendar.timeInMillis
 
     var year by mutableIntStateOf(_calendar.get(Calendar.YEAR))
         private set
@@ -78,6 +82,16 @@ class CalendarState internal constructor(
         month = _calendar.get(Calendar.MONTH)
         day = _calendar.get(Calendar.DAY_OF_MONTH)
         timeInMillis = _calendar.timeInMillis
+    }
+
+    fun setHourOfDay(hourOfDay: Int) {
+        _calendar.set(Calendar.HOUR_OF_DAY, hourOfDay)
+        syncState()
+    }
+
+    fun setMinute(minute: Int) {
+        _calendar.set(Calendar.MINUTE, minute)
+        syncState()
     }
 
     fun addDays(days: Int) {
@@ -107,7 +121,7 @@ class CalendarState internal constructor(
 
     fun reset() {
         _calendar.clear()
-        _calendar.timeInMillis = System.currentTimeMillis()
+        _calendar.timeInMillis = initialTime
         syncState()
     }
 }
@@ -121,22 +135,96 @@ fun rememberCalendarState(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DateTimePicker(
+    modifier: Modifier = Modifier,
+    state: CalendarState,
+    onSuccess: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var step by remember { mutableIntStateOf(1) }
+    val nextStep = remember {
+        {
+            if (step == 1) {
+                step++
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { step = 1 }
+    }
+    if (step == 1) {
+        YearMonthDayPickerDialog(
+            properties = DialogProperties(
+                dismissOnClickOutside = false,
+                dismissOnBackPress = false
+            ),
+            initial = state.getCalendar(),
+            onConfirm = { y, m, d ->
+                state.setDate(y, m, d)
+                nextStep()
+            },
+            onDismiss = {
+                state.reset()
+                onCancel()
+            }
+        )
+    } else if (step == 2) {
+        val timePickerState = state.getCalendar().run {
+            rememberTimePickerState(
+                initialHour = get(Calendar.HOUR_OF_DAY),
+                initialMinute = get(Calendar.MINUTE),
+                is24Hour = true
+            )
+        }
+        AlertDialog(
+            modifier = modifier,
+            properties = DialogProperties(
+                dismissOnClickOutside = false,
+                dismissOnBackPress = false
+            ),
+            onDismissRequest = onCancel,
+            dismissButton = {
+                TextButton(onClick = {
+                    state.reset()
+                    onCancel()
+                }) {
+                    Text(text = "取消")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.setHourOfDay(timePickerState.hour)
+                    state.setMinute(timePickerState.minute)
+                    onSuccess()
+                }) {
+                    Text(text = "确定")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            }
+        )
+    }
+}
+
 @Composable
 fun DaySelector(
     modifier: Modifier = Modifier,
-    calendarState: CalendarState,
+    state: CalendarState
 ) {
     var showPicker by remember { mutableStateOf(false) }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
 
         IconButton(onClick = {
-            calendarState.addDays(-1)
+            state.addDays(-1)
         }) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Day")
         }
 
         Text(
-            text = "${calendarState.year}年${calendarState.month + 1}月${calendarState.day}日",
+            text = "${state.year}年${state.month + 1}月${state.day}日",
             modifier = Modifier
                 .padding(horizontal = 16.dp)
                 .clickable {
@@ -147,87 +235,36 @@ fun DaySelector(
         )
 
         IconButton(onClick = {
-            calendarState.addDays(1)
+            state.addDays(1)
         }) {
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Day")
         }
     }
     if (showPicker) {
         YearMonthDayPickerDialog(
-            onDismissRequest = { showPicker = false },
-            calendarState = calendarState
+            initial = state.getCalendar(),
+            onConfirm = { y, m, d ->
+                state.setDate(y, m, d)
+                showPicker = false
+            },
+            onDismiss = {
+                showPicker = false
+            }
         )
     }
 }
 
 @Composable
-fun YearMonthDayPickerDialog(
+private fun YearMonthDayPickerDialog(
     modifier: Modifier = Modifier,
-    onDismissRequest: () -> Unit,
-    calendarState: CalendarState,
+    properties: DialogProperties = DialogProperties(),
+    initial: Calendar,
+    onConfirm: (Int, Int, Int) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        modifier = modifier,
-        onDismissRequest = onDismissRequest,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                TextButton(
-                    onClick = {
-                        calendarState.reset()
-                        calendarState.addDays(-2)
-                        onDismissRequest()
-                    }
-                ) {
-                    Text(text = "前天")
-                }
-                TextButton(
-                    onClick = {
-                        calendarState.reset()
-                        calendarState.addDays(-1)
-                        onDismissRequest()
-                    }
-                ) {
-                    Text(text = "昨天")
-                }
-                TextButton(
-                    onClick = {
-                        calendarState.reset()
-                        onDismissRequest()
-                    }
-                ) {
-                    Text(text = "今天")
-                }
-            }
-        },
-        text = {
-            calendarState.getCalendar().run {
-                YearMonthDayPicker(
-                    year = get(Calendar.YEAR),
-                    month = get(Calendar.MONTH),
-                    day = get(Calendar.DAY_OF_MONTH),
-                    onConfirm = { y, m, d ->
-                        calendarState.setDate(y, m, d)
-                        onDismissRequest()
-                    }
-                )
-            }
-        },
-        confirmButton = {}
-    )
-}
-
-
-@Composable
-fun YearMonthDayPicker(
-    year: Int,
-    month: Int,
-    day: Int,
-    onConfirm: (Int, Int, Int) -> Unit
-) {
+    val year = initial.get(Calendar.YEAR)
+    val month = initial.get(Calendar.MONTH)
+    val day = initial.get(Calendar.DAY_OF_MONTH)
     val years = (2000..2100).toList()
     val months = (1..12).toList()
 
@@ -245,45 +282,119 @@ fun YearMonthDayPicker(
     val yearState = rememberLazyListState(initialFirstVisibleItemIndex = years.indexOf(year))
     val monthState = rememberLazyListState(initialFirstVisibleItemIndex = months.indexOf(month + 1))
     val dayState = rememberLazyListState(initialFirstVisibleItemIndex = days.indexOf(day))
+    AlertDialog(
+        modifier = modifier,
+        onDismissRequest = onDismiss,
+        properties = properties,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                TextButton(
+                    onClick = {
+                        initial.run {
+                            clear()
+                            timeInMillis = System.currentTimeMillis()
+                            add(Calendar.DAY_OF_MONTH, -2)
+                            onConfirm(
+                                get(Calendar.YEAR),
+                                get(Calendar.MONTH),
+                                get(Calendar.DAY_OF_MONTH)
+                            )
+                        }
+                    }
+                ) {
+                    Text(text = "前天")
+                }
+                TextButton(
+                    onClick = {
+                        initial.run {
+                            clear()
+                            timeInMillis = System.currentTimeMillis()
+                            add(Calendar.DAY_OF_MONTH, -1)
+                            onConfirm(
+                                get(Calendar.YEAR),
+                                get(Calendar.MONTH),
+                                get(Calendar.DAY_OF_MONTH)
+                            )
+                        }
+                    }
+                ) {
+                    Text(text = "昨天")
+                }
+                TextButton(
+                    onClick = {
+                        initial.run {
+                            clear()
+                            timeInMillis = System.currentTimeMillis()
+                            onConfirm(
+                                get(Calendar.YEAR),
+                                get(Calendar.MONTH),
+                                get(Calendar.DAY_OF_MONTH)
+                            )
+                        }
+                    }
+                ) {
+                    Text(text = "今天")
+                }
+            }
+        },
+        text = {
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(300.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            PickerList(
-                items = years,
-                state = yearState,
-                label = "年",
-                onSelectedItemChanged = { selectedYear = it }
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.width(300.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    PickerList(
+                        items = years,
+                        state = yearState,
+                        label = "年",
+                        onSelectedItemChanged = { selectedYear = it }
+                    )
 
-            PickerList(
-                items = months,
-                state = monthState,
-                label = "月",
-                onSelectedItemChanged = { selectedMonth = it - 1 }
-            )
+                    PickerList(
+                        items = months,
+                        state = monthState,
+                        label = "月",
+                        onSelectedItemChanged = { selectedMonth = it - 1 }
+                    )
 
-            PickerList(
-                items = days,
-                state = dayState,
-                label = "日",
-                onSelectedItemChanged = { selectedDay = it }
-            )
+                    PickerList(
+                        items = days,
+                        state = dayState,
+                        label = "日",
+                        onSelectedItemChanged = { selectedDay = it }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(
+                        selectedYear,
+                        selectedMonth,
+                        selectedDay
+                    )
+                }
+            ) {
+                Text(text = "确定")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(text = "取消")
+            }
         }
-
-        Spacer(Modifier.height(16.dp))
-
-        Button(onClick = {
-            onConfirm(selectedYear, selectedMonth, selectedDay)
-        }) {
-            Text("确定")
-        }
-    }
+    )
 }
 
 @Composable
